@@ -10,11 +10,8 @@ jobs:
   rust:
     name: Rust build and lint
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rust-backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -27,31 +24,10 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust-backend/target
+            target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --manifest-path rust-backend/Cargo.toml --all-targets -- -D warnings
       - name: Build
-        run: cargo build --release
-
-  frontend:
-    name: Frontend build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: stock-info-frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-          run_install: true
-      - name: Build
-        run: pnpm build
-
+        run: cargo build --manifest-path rust-backend/Cargo.toml --release
 
