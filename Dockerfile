@@ -1,27 +1,23 @@
 # syntax=docker/dockerfile:1
 
-# Build stage
+# Build
 FROM rust:1.80-slim AS builder
 WORKDIR /app
 
-# System deps for reqwest native-tls
 RUN apt-get update && \
     apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Cache deps
-COPY rust-backend/Cargo.toml rust-backend/Cargo.lock ./
-# Create a dummy src to build dep graph
+# 仅复制清单以命中依赖缓存
+COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src && echo "fn main(){}" > src/main.rs && \
     cargo build --release && rm -rf target/release/deps/rust_backend*
 
-# Copy actual source
-COPY rust-backend/ ./
-
-# Build release
+# 复制源码并编译
+COPY . ./
 RUN cargo build --release
 
-# Runtime stage
+# Runtime
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
@@ -36,10 +32,7 @@ ENV PORT=8000
 COPY --from=builder /app/target/release/rust-backend /usr/local/bin/rust-backend
 
 EXPOSE 8000
-
 HEALTHCHECK --interval=30s --timeout=5s --retries=5 CMD \
-  /bin/sh -c "wget -qO- http://127.0.0.1:${PORT}/healthz || exit 1"
+    /bin/sh -c "wget -qO- http://127.0.0.1:${PORT}/healthz || exit 1"
 
 CMD ["rust-backend"]
-
-
