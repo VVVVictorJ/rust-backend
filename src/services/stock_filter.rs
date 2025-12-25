@@ -20,8 +20,6 @@ pub enum StockFilterError {
     Http(#[from] reqwest::Error),
     #[error("polars error: {0}")]
     Polars(#[from] PolarsError),
-    #[error("json error: {0}")]
-    Json(String),
 }
 
 #[derive(Debug, Clone)]
