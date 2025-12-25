@@ -71,8 +71,8 @@ jobs:
         if: ${{ steps.cred.outputs.has == 'true' && steps.df.outputs.use_subdir == 'true' }}
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: rust-backend/Dockerfile
+          context: rust-backend
+          file: Dockerfile
           push: true
           platforms: linux/amd64
           tags: |

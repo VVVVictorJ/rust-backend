@@ -1,15 +1,15 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM rust:1.80-slim AS builder
+FROM rust:1.84-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# 仅复制清单以命中依赖缓存
-COPY Cargo.toml Cargo.lock ./
+# 仅复制清单以命中依赖缓存（锁文件可缺省）
+COPY Cargo.toml ./
 RUN mkdir -p src && echo "fn main(){}" > src/main.rs && \
     cargo build --release && rm -rf target/release/deps/rust_backend*
 
