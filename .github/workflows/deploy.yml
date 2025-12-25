@@ -54,12 +54,40 @@ jobs:
             echo "ref_tag=${REF_TAG}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build and push rust-backend
-        if: ${{ steps.cred.outputs.has == 'true' }}
+      - name: Detect Dockerfile location
+        id: df
+        shell: bash
+        run: |
+          if [ -f "rust-backend/Dockerfile" ]; then
+            echo "use_subdir=true" >> "$GITHUB_OUTPUT"
+          elif [ -f "Dockerfile" ]; then
+            echo "use_subdir=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No Dockerfile found" >&2
+            exit 1
+          fi
+
+      - name: Build and push rust-backend (subdir)
+        if: ${{ steps.cred.outputs.has == 'true' && steps.df.outputs.use_subdir == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           file: rust-backend/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', env.BACKEND_IMAGE, steps.meta.outputs.ref_tag) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push rust-backend (root)
+        if: ${{ steps.cred.outputs.has == 'true' && steps.df.outputs.use_subdir == 'false' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
           push: true
           platforms: linux/amd64
           tags: |
