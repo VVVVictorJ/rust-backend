@@ -131,9 +131,6 @@ jobs:
             docker compose pull backend
             docker compose up -d backend
             docker image prune -f
-      - name: Skip deploy (missing SSH secrets)
-        if: ${{ steps.sshcred.outputs.has != 'true' }}
-        run: |
-          echo "Skipping deploy: missing SSH secrets" >> "$GITHUB_OUTPUT"
+
 
 
