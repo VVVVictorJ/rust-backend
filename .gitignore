@@ -1,0 +1,56 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs & temp
+*.log
+*.tmp
+.tmp/
+.cache/
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+dist/
+build/
+*.egg-info/
+
+# Environment files
+.env
+.env.*
+
+# Node/Vue (frontend)
+node_modules/
+dist/
+.eslintcache
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vite/
+
+# Rust (rust-backend)
+rust-backend/target/
+# NOTE: Keep Cargo.lock tracked for binary apps
+
+# Docker (optional env overrides)
+docker/*.env
+*.local.env
+
+
