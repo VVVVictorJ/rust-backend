@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use crate::routes::stock::{internal_error, StockQuery};
 use crate::utils::secid::code_to_secid;
+ use crate::services::stock_filter::{FilterParams, get_filtered_stocks_param as svc_get_filtered_stocks_param};
 
 pub async fn get_stock(
     Query(q): Query<StockQuery>,
@@ -19,7 +20,18 @@ pub async fn get_stock(
     let url = "https://push2.eastmoney.com/api/qt/stock/get";
     let fields = "f57,f58,f43,f170,f50,f168,f191,f137";
 
-    let client = reqwest::Client::new();
+     let client = {
+         use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, ACCEPT, REFERER, ACCEPT_ENCODING};
+         let mut headers = HeaderMap::new();
+         headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+         headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/plain, */*"));
+         headers.insert(REFERER, HeaderValue::from_static("https://quote.eastmoney.com"));
+         headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
+         reqwest::Client::builder()
+             .default_headers(headers)
+             .build()
+             .unwrap()
+     };
     let resp = client
         .get(url)
         .query(&[
@@ -58,3 +70,63 @@ pub async fn get_stock(
 
     Ok((StatusCode::OK, Json(response_body)))
 }
+
+ #[derive(Debug, serde::Deserialize)]
+ pub struct FilterParamQuery {
+     #[serde(default = "default_pct_min")]
+     pub pct_min: f64,
+     #[serde(default = "default_pct_max")]
+     pub pct_max: f64,
+     #[serde(default = "default_lb_min")]
+     pub lb_min: f64,
+     #[serde(default = "default_hs_min")]
+     pub hs_min: f64,
+     #[serde(default = "default_wb_min")]
+     pub wb_min: f64,
+     #[serde(default = "default_concurrency")]
+     pub concurrency: i32,
+     #[serde(default)]
+     pub limit: i32,
+     #[serde(default = "default_pz")]
+     pub pz: i32,
+ }
+ 
+ fn default_pct_min() -> f64 { 2.0 }
+ fn default_pct_max() -> f64 { 5.0 }
+ fn default_lb_min() -> f64 { 5.0 }
+ fn default_hs_min() -> f64 { 1.0 }
+ fn default_wb_min() -> f64 { 20.0 }
+ fn default_concurrency() -> i32 { 8 }
+ fn default_pz() -> i32 { 1000 }
+ 
+ pub async fn get_filtered_stocks_param(
+     Query(p): Query<FilterParamQuery>,
+ ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+     let params = FilterParams {
+         pct_min: p.pct_min,
+         pct_max: p.pct_max,
+         lb_min: p.lb_min,
+         hs_min: p.hs_min,
+         wb_min: p.wb_min,
+         concurrency: (p.concurrency.max(1).min(64)) as usize,
+         limit: p.limit.max(0) as usize,
+         pz: p.pz,
+     };
+     let client = {
+         use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, ACCEPT, REFERER, ACCEPT_ENCODING};
+         let mut headers = HeaderMap::new();
+         headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"));
+         headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/plain, */*"));
+         headers.insert(REFERER, HeaderValue::from_static("https://quote.eastmoney.com"));
+         headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
+         reqwest::Client::builder()
+             .default_headers(headers)
+             .build()
+             .unwrap()
+     };
+     match svc_get_filtered_stocks_param(&client, params).await {
+         Ok(v) => Ok((StatusCode::OK, Json(v))),
+         Err(e) => Err(internal_error(e)),
+     }
+ }
+ 

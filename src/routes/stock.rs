@@ -1,4 +1,4 @@
-use crate::handler::stock::get_stock;
+use crate::handler::stock::{get_stock, get_filtered_stocks_param};
 use axum::{routing::get, Router};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -24,7 +24,9 @@ pub struct StockResponse {
 }
 
 pub fn router() -> Router {
-    Router::new().route("/stock", get(get_stock))
+    Router::new()
+        .route("/stock", get(get_stock))
+        .route("/stock/filtered/param", get(get_filtered_stocks_param))
 }
 
 pub fn internal_error<E: std::error::Error>(err: E) -> (axum::http::StatusCode, axum::Json<Value>) {
