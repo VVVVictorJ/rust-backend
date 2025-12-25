@@ -59,19 +59,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push stock-info-frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: stock-info-frontend
-          file: stock-info-frontend/Dockerfile
-          push: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
-          platforms: linux/amd64
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.sha }}
-            ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', env.FRONTEND_IMAGE, steps.meta.outputs.ref_tag) || '' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy to Tencent Cloud
