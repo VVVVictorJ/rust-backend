@@ -1,6 +1,5 @@
 use crate::handler::stock::{get_stock, get_filtered_stocks_param};
 use axum::{routing::get, Router};
-use serde::Serialize;
 use serde_json::{json, Value};
 
 #[derive(Debug, serde::Deserialize)]
