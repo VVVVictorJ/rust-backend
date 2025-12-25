@@ -10,9 +10,6 @@ jobs:
   rust:
     name: Rust build and lint
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rust-backend
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
       - name: Setup Rust
@@ -21,6 +18,17 @@ jobs:
           toolchain: stable
           override: true
           components: clippy, rustfmt
+      - name: Resolve Cargo manifest path
+        id: manifest
+        run: |
+          if [ -f rust-backend/Cargo.toml ]; then
+            echo "CARGO_MANIFEST=rust-backend/Cargo.toml" >> $GITHUB_ENV
+          elif [ -f Cargo.toml ]; then
+            echo "CARGO_MANIFEST=Cargo.toml" >> $GITHUB_ENV
+          else
+            echo "Cargo.toml not found" >&2
+            exit 1
+          fi
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -30,7 +38,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --manifest-path "${{ env.CARGO_MANIFEST }}" --all-targets -- -D warnings
       - name: Build
-        run: cargo build --release
+        run: cargo build --manifest-path "${{ env.CARGO_MANIFEST }}" --release
 
