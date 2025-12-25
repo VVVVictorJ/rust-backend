@@ -16,13 +16,6 @@ fn default_source() -> String {
     "em".to_string()
 }
 
-#[derive(Serialize)]
-pub struct StockResponse {
-    pub source: String,
-    pub code: String,
-    pub data: Value,
-}
-
 pub fn router() -> Router {
     Router::new()
         .route("/stock", get(get_stock))

@@ -108,7 +108,7 @@ pub async fn get_stock(
          lb_min: p.lb_min,
          hs_min: p.hs_min,
          wb_min: p.wb_min,
-         concurrency: (p.concurrency.max(1).min(64)) as usize,
+         concurrency: p.concurrency.clamp(1, 64) as usize,
          limit: p.limit.max(0) as usize,
          pz: p.pz,
      };

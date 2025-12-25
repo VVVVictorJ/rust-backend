@@ -80,7 +80,7 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     if let Some(diff) = data.get("diff").and_then(|v| v.as_array()) {
         all.extend_from_slice(diff);
     }
-    let pages = if total <= 0 { 1 } else { ((total as i32 + pz - 1) / pz) as i32 };
+    let pages = if total <= 0 { 1 } else { (total as i32 + pz - 1) / pz };
 
     // fetch rest pages with limited concurrency
     let semaphore = Arc::new(Semaphore::new(concurrency));
