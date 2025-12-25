@@ -1,4 +1,5 @@
 mod app;
+mod handler;
 mod routes;
 mod utils;
 

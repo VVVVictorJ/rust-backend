@@ -1,7 +1,7 @@
 use axum::Router;
 
 mod root;
-mod stock;
+pub mod stock;
 
 pub fn build_routes() -> Router {
     Router::new()
