@@ -8,8 +8,8 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# 仅复制清单以命中依赖缓存（锁文件可缺省）
-COPY Cargo.toml ./
+# 复制清单与锁文件以命中依赖缓存并锁定依赖版本
+COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src && echo "fn main(){}" > src/main.rs && \
     cargo build --release && rm -rf target/release/deps/rust_backend*
 
