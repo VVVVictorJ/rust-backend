@@ -20,4 +20,9 @@ polars = { version = "0.38", features = ["dtype-categorical", "performant", "laz
 thiserror = "1.0"
 hashbrown = { version = "0.14", features = ["raw"] }
 
+[patch.crates-io]
+# 修复 CI/Docker 构建中 transitive crate `home` 0.5.12 需要 edition2024（仅 nightly 可用）的问题
+# 强制使用 0.5.11（edition 2021），避免 nightly 依赖
+home = "=0.5.11"
+
 
