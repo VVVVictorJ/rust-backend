@@ -17,7 +17,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      # Pin to a specific commit to avoid tag resolution issues
+      # v4.1.1 commit
+      # https://github.com/actions/checkout/commit/b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
