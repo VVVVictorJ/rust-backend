@@ -11,11 +11,11 @@ RUN apt-get update && \
 # 复制清单与锁文件以命中依赖缓存并锁定依赖版本
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src && echo "fn main(){}" > src/main.rs && \
-    cargo build --release && rm -rf target/release/deps/rust_backend*
+    cargo build --release --locked && rm -rf target/release/deps/rust_backend*
 
 # 复制源码并编译
 COPY . ./
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Runtime
 FROM debian:bookworm-slim AS runtime
