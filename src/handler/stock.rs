@@ -1,11 +1,13 @@
+use anyhow::Result;
 use axum::{extract::Query, http::StatusCode, Json};
 use serde_json::Value;
-use anyhow::Result;
 
-use crate::routes::stock::{StockQuery, internal_error};
+use crate::routes::stock::{internal_error, StockQuery};
 use crate::utils::secid::code_to_secid;
 
-pub async fn get_stock(Query(q): Query<StockQuery>) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+pub async fn get_stock(
+    Query(q): Query<StockQuery>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
     if q.source.as_str() != "em" {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -40,10 +42,13 @@ pub async fn get_stock(Query(q): Query<StockQuery>) -> Result<(StatusCode, Json<
     }
 
     let json_body: Value = resp.json().await.map_err(internal_error)?;
-    let response_body = if q.raw_only{
+    let response_body = if q.raw_only {
         json_body
-    }else{
-        let data = json_body.get("data").cloned().unwrap_or_else(|| serde_json::json!({}));
+    } else {
+        let data = json_body
+            .get("data")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
         serde_json::json!({
             "source": "em",
             "code": q.code,
@@ -53,5 +58,3 @@ pub async fn get_stock(Query(q): Query<StockQuery>) -> Result<(StatusCode, Json<
 
     Ok((StatusCode::OK, Json(response_body)))
 }
-
-

@@ -6,5 +6,3 @@ pub fn code_to_secid(code: &str) -> String {
         format!("0.{}", trimmed)
     }
 }
-
-

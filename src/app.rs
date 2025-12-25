@@ -1,5 +1,7 @@
 use axum::Router;
-use tower_http::trace::{DefaultMakeSpan, DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tower_http::trace::{
+    DefaultMakeSpan, DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, TraceLayer,
+};
 use tracing::Level;
 
 use crate::routes;
@@ -16,5 +18,3 @@ pub fn build_app() -> Router {
                 .on_failure(DefaultOnFailure::new().level(Level::ERROR)),
         )
 }
-
-

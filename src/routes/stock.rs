@@ -1,7 +1,7 @@
-use axum::{Router, routing::get};
+use crate::handler::stock::get_stock;
+use axum::{routing::get, Router};
 use serde::Serialize;
 use serde_json::{json, Value};
-use crate::handler::stock::get_stock;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct StockQuery {

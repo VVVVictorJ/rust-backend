@@ -17,6 +17,9 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("bind failed");
-    tracing::info!("Axum listening on http://{}", listener.local_addr().unwrap());
+    tracing::info!(
+        "Axum listening on http://{}",
+        listener.local_addr().unwrap()
+    );
     axum::serve(listener, app).await.expect("server failed");
 }
