@@ -181,16 +181,15 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     // collect codes
     let mut codes: Vec<String> = Vec::new();
     let mut seen = HashSet::new();
-    for opt in filtered
+    for s in filtered
         .column("f12")?
         .str()?
         .into_iter()
+        .flatten()
     {
-        if let Some(s) = opt {
-            let code = s.to_string();
-            if seen.insert(code.clone()) {
-                codes.push(code);
-            }
+        let code = s.to_string();
+        if seen.insert(code.clone()) {
+            codes.push(code);
         }
     }
 
