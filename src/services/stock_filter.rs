@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -178,12 +179,20 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     let filtered = lf.collect()?;
 
     // collect codes
-    let codes: Vec<String> = filtered
+    let mut codes: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
+    for opt in filtered
         .column("f12")?
         .str()?
         .into_iter()
-        .filter_map(|opt| opt.map(|s| s.to_string()))
-        .collect();
+    {
+        if let Some(s) = opt {
+            let code = s.to_string();
+            if seen.insert(code.clone()) {
+                codes.push(code);
+            }
+        }
+    }
 
     // fetch details in parallel (limited)
     let semaphore = Arc::new(Semaphore::new(concurrency));
