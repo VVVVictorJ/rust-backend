@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  BACKEND_IMAGE: ${{ vars.DOCKER_BACKEND_IMAGE != '' && vars.DOCKER_BACKEND_IMAGE || 'vic777/rust-backend' }}
+  BACKEND_IMAGE: vic777/rust-backend
 
 jobs:
   build-and-push:
