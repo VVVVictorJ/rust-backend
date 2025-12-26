@@ -38,7 +38,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Clippy
-        run: cargo clippy --manifest-path "${{ env.CARGO_MANIFEST }}" --all-targets -- -D warnings
+        run: cargo clippy --manifest-path $CARGO_MANIFEST --all-targets -- -D warnings
       - name: Build
-        run: cargo build --manifest-path "${{ env.CARGO_MANIFEST }}" --release
+        run: cargo build --manifest-path $CARGO_MANIFEST --release
 
