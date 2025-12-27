@@ -1,0 +1,57 @@
+API 调用示例（curl）及预期返回
+基础地址: http://localhost:8001
+前缀: /api
+Header: Content-Type: application/json
+
+前置条件:
+- stock_request_stocks / stock_snapshots 需要存在的 stock_requests.id 作为 request_id
+- profit_analyses 需要存在的 stock_snapshots.id 作为 snapshot_id
+
+1) 创建 stock_request_stock（无返回 ID）
+curl -i -X POST http://localhost:8001/api/stock-request-stocks \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":1,"stock_code":"SH600519"}'
+预期: 201 Created；外键/唯一性错误返回 400
+
+2) 创建 stock_snapshot（返回自增 id）
+curl -i -X POST http://localhost:8001/api/stock-snapshots \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id":2,
+    "stock_code":"SH600519",
+    "stock_name":"贵州茅台",
+    "latest_price":1800.00,
+    "change_pct":2.50,
+    "volume_ratio":1.20,
+    "turnover_rate":0.8500,
+    "bid_ask_ratio":1.05,
+    "main_force_inflow":15000.00
+  }'
+预期: 201 Created + {"id": <i32>}；外键/唯一性错误返回 400
+
+3) 查询 stock_snapshot
+curl -i http://localhost:8001/api/stock-snapshots/1
+预期: 存在 → 200 OK + JSON；不存在 → 404 Not Found
+
+4) 删除 stock_snapshot
+curl -i -X DELETE http://localhost:8001/api/stock-snapshots/1
+预期: 存在 → 204 No Content；不存在 → 404 Not Found
+
+5) 创建 profit_analysis（返回自增 id）
+curl -i -X POST http://localhost:8001/api/profit-analyses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "snapshot_id":4,
+    "strategy_name":"momentum_v1",
+    "profit_rate":5.25
+  }'
+预期: 201 Created + {"id": <i32>}；外键错误返回 400
+
+6) 查询 profit_analysis
+curl -i http://localhost:8001/api/profit-analyses/1
+预期: 存在 → 200 OK + JSON；不存在 → 404 Not Found
+
+7) 删除 profit_analysis
+curl -i -X DELETE http://localhost:8001/api/profit-analyses/4
+预期: 存在 → 204 No Content；不存在 → 404 Not Found
+
