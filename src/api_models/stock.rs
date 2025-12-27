@@ -12,4 +12,3 @@ pub struct FilteredStockItem {
     pub f137: Option<f64>,
 }
 
-

@@ -8,7 +8,7 @@ use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Semaphore;
 
-use crate::models::stock::FilteredStockItem;
+use crate::api_models::stock::FilteredStockItem;
 use crate::utils::percent::normalize_percent_scalar;
 use crate::utils::secid::code_to_secid;
 
