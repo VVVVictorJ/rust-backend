@@ -1,6 +1,7 @@
 mod app;
 mod api_models;
 mod handler;
+mod repositories;
 mod models;
 mod schema;
 mod routes;
