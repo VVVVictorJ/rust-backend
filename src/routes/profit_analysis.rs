@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete}, Router};
+use axum::{routing::{get, post}, Router};
 
 use crate::app::AppState;
 use crate::handler::profit_analysis::{create_profit_analysis, delete_profit_analysis, get_profit_analysis};

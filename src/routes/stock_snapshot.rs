@@ -1,4 +1,4 @@
-use axum::{routing::{get, post, delete}, Router};
+use axum::{routing::{get, post}, Router};
 
 use crate::app::AppState;
 use crate::handler::stock_snapshot::{create_stock_snapshot, delete_stock_snapshot, get_stock_snapshot};
