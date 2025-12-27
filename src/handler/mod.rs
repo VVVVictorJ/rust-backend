@@ -1,4 +1,5 @@
 pub mod stock;
+pub mod stock_persist;
 pub mod stock_request;
 pub mod error;
 pub mod stock_snapshot;
