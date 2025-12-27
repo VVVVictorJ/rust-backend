@@ -6,7 +6,7 @@ pub mod stock_request_stock;
 pub mod daily_kline;
 
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
-pub use stock_snapshot::{StockSnapshotResponse, CreateStockSnapshot};
+pub use stock_snapshot::{StockSnapshotResponse, CreateStockSnapshot, TodayStockCodesResponse};
 pub use profit_analysis::{ProfitAnalysisResponse, CreateProfitAnalysis};
 pub use stock_request_stock::{CreateStockRequestStock, StockRequestStockResponse};
 pub use daily_kline::{CreateDailyKline, DailyKlineResponse};

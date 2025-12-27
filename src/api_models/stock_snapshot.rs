@@ -30,3 +30,9 @@ pub struct CreateStockSnapshot {
     pub main_force_inflow: BigDecimal,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TodayStockCodesResponse {
+    pub count: usize,
+    pub stock_codes: Vec<String>,
+}
+

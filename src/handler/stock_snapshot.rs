@@ -6,7 +6,7 @@ use axum::{
 use diesel::result::Error as DieselError;
 use serde::Serialize;
 
-use crate::api_models::stock_snapshot::{CreateStockSnapshot, StockSnapshotResponse};
+use crate::api_models::stock_snapshot::{CreateStockSnapshot, StockSnapshotResponse, TodayStockCodesResponse};
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::models::NewStockSnapshot;
@@ -74,6 +74,18 @@ pub async fn delete_stock_snapshot(
         return Err(AppError::NotFound);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn get_today_stock_codes(
+    State(state): State<AppState>,
+) -> Result<Json<TodayStockCodesResponse>, AppError> {
+    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let codes = stock_snapshot::get_distinct_codes_today(&mut conn).map_err(map_err)?;
+    let count = codes.len();
+    Ok(Json(TodayStockCodesResponse {
+        count,
+        stock_codes: codes,
+    }))
 }
 
 fn map_err(err: DieselError) -> AppError {
