@@ -3,9 +3,11 @@ pub mod stock_request;
 pub mod stock_snapshot;
 pub mod profit_analysis;
 pub mod stock_request_stock;
+pub mod daily_kline;
 
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
 pub use stock_snapshot::{StockSnapshotResponse, CreateStockSnapshot};
 pub use profit_analysis::{ProfitAnalysisResponse, CreateProfitAnalysis};
 pub use stock_request_stock::{CreateStockRequestStock, StockRequestStockResponse};
+pub use daily_kline::{CreateDailyKline, DailyKlineResponse};
 

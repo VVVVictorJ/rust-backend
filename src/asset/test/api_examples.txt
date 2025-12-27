@@ -20,6 +20,33 @@ Header: Content-Type: application/json
  1.2) 删除 stock_request_stock
  curl -i -X DELETE http://localhost:8001/api/stock-request-stocks/1/SH600519
  预期: 存在 → 204 No Content；不存在 → 404
+ 
+ 1.3) 查询另一个示例（按需替换参数，需真实存在）
+ curl -i http://localhost:8001/api/stock-request-stocks/2/SH600519
+ 预期: 存在 → 200 OK + {"request_id":2,"stock_code":"SH600519"}；不存在 → 404
+ 
+ 8) 创建 daily_kline（复合主键，无返回 ID）
+ curl -i -X POST http://localhost:8001/api/daily-klines \
+   -H "Content-Type: application/json" \
+   -d '{
+     "stock_code":"SH600519",
+     "trade_date":"2024-01-02",
+     "open_price":1700.00,
+     "high_price":1820.00,
+     "low_price":1690.00,
+     "close_price":1805.00,
+     "volume":123456789,
+     "amount":99999999.99
+   }'
+ 预期: 201 Created + 全量 JSON；唯一性/约束错误返回 400
+ 
+ 9) 查询 daily_kline（路径含 stock_code 与 trade_date）
+ curl -i http://localhost:8001/api/daily-klines/SH600519/2024-01-02
+ 预期: 存在 → 200 OK + JSON；不存在 → 404
+ 
+ 10) 删除 daily_kline
+ curl -i -X DELETE http://localhost:8001/api/daily-klines/SH600519/2024-01-02
+ 预期: 存在 → 204 No Content；不存在 → 404
 
 2) 创建 stock_snapshot（返回自增 id）
 curl -i -X POST http://localhost:8001/api/stock-snapshots \

@@ -8,13 +8,15 @@ mod stock_request;
 mod stock_snapshot;
 mod profit_analysis;
 mod stock_request_stock;
+mod daily_kline;
 
 pub fn build_routes() -> Router<AppState> {
     let api_router = Router::new()
         .merge(stock::router())
         .nest("/stock-request-stocks", stock_request_stock::router())
         .nest("/stock-snapshots", stock_snapshot::router())
-        .nest("/profit-analyses", profit_analysis::router());
+        .nest("/profit-analyses", profit_analysis::router())
+        .nest("/daily-klines", daily_kline::router());
 
     Router::new()
         // 根路径与健康检查
