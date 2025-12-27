@@ -3,9 +3,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use bigdecimal::BigDecimal;
 use serde_json::Value;
-use std::str::FromStr;
 
 use crate::app::AppState;
 use crate::handler::stock::FilterParamQuery;
@@ -13,6 +11,7 @@ use crate::models::{NewStockRequest, NewStockSnapshot};
 use crate::repositories::{stock_request, stock_snapshot};
 use crate::routes::stock::internal_error;
 use crate::services::stock_filter::{get_filtered_stocks_param as svc_get_filtered_stocks_param, FilterParams};
+use crate::utils::bigdecimal_parser::parse_bigdecimal;
 
 /// 带数据库持久化的筛选股票接口
 /// 在获取筛选结果后，如果 items 非空，自动将请求和快照数据存入数据库
@@ -75,10 +74,11 @@ async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn 
     let mut conn = state.db_pool.get()?;
 
     // 1. 插入 stock_requests 记录
+    let now_date = chrono::Utc::now().date_naive();
     let new_request = NewStockRequest {
         strategy_name: Some("filtered_param".to_string()),
-        time_range_start: None,
-        time_range_end: None,
+        time_range_start: Some(now_date),
+        time_range_end: Some(now_date),
     };
     let created_request = stock_request::create(&mut conn, &new_request)?;
     let request_id = created_request.id;
@@ -120,20 +120,5 @@ async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn 
     }
 
     Ok(())
-}
-
-/// 将 JSON Value 解析为 BigDecimal
-fn parse_bigdecimal(v: Option<&Value>) -> BigDecimal {
-    match v {
-        Some(Value::Number(n)) => {
-            if let Some(f) = n.as_f64() {
-                BigDecimal::from_str(&f.to_string()).unwrap_or_else(|_| BigDecimal::from(0))
-            } else {
-                BigDecimal::from(0)
-            }
-        }
-        Some(Value::String(s)) => BigDecimal::from_str(s).unwrap_or_else(|_| BigDecimal::from(0)),
-        _ => BigDecimal::from(0),
-    }
 }
 
