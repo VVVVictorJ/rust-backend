@@ -1,6 +1,7 @@
 # rust-backend（Axum + Diesel + Postgres）
 
 面向“股票信息查询/筛选 + 分析结果落库”的后端服务：
+
 - **对外数据抓取**：从东方财富（EastMoney）接口拉取单只股票行情与批量列表，并用 `polars` 做条件筛选
 - **数据持久化**：使用 `Diesel + r2d2` 连接 Postgres，存储请求、请求-股票关联、快照、日K线、收益分析
 
@@ -9,10 +10,12 @@
 ## 功能与接口概览
 
 ### 基础
+
 - **GET** `/`：`Axum minimal backend`
 - **GET** `/healthz`：`ok`
 
 ### 股票数据（上游：EastMoney）
+
 - **GET** `/api/stock`
   - query：`code`（6位数字代码，如 `600519`）、`source`（仅支持 `em`，默认 `em`）、`raw_only`（默认 `false`）
 - **GET** `/api/stock/filtered/param`
@@ -28,22 +31,20 @@
 > 说明：前端里曾出现 `/api/stock/filtered` 的调用，但当前后端仅实现了 `/api/stock/filtered/param`。
 
 ### 数据落库（Postgres）
+
 - **POST** `/stock-requests`
 - **GET/DELETE** `/stock-requests/:id`
-
 - **POST** `/api/stock-request-stocks`
 - **GET/DELETE** `/api/stock-request-stocks/:request_id/:stock_code`
-
 - **POST** `/api/stock-snapshots`
 - **GET/DELETE** `/api/stock-snapshots/:id`
-
 - **POST** `/api/profit-analyses`
 - **GET/DELETE** `/api/profit-analyses/:id`
-
 - **POST** `/api/daily-klines`
 - **GET/DELETE** `/api/daily-klines/:stock_code/:trade_date`
 
 ## 技术栈
+
 - **Web**：`axum 0.7`、`tokio`、`tower-http`（Trace/CORS）
 - **DB**：`diesel 2.x` + `r2d2`（Postgres）
 - **HTTP Client**：`reqwest`（gzip）
@@ -51,6 +52,7 @@
 - **配置/日志**：`dotenvy`、`tracing` + `tracing-subscriber`
 
 ## 目录结构（关键部分）
+
 - `src/app.rs`：创建 Postgres 连接池、注入 `AppState`、挂载中间件（CORS/Trace）
 - `src/routes/`：路由定义（/api 与 /stock-requests）
 - `src/handler/`：HTTP handler（请求解析、调用 repo/service、统一错误）
@@ -120,6 +122,12 @@ cargo run
 
 启动后访问：`http://127.0.0.1:8001/healthz`
 
+## Diesel 迁移
+
+```
+diesel migration
+```
+
 ## Docker 运行
 
 ### 仅运行后端容器（需要外部 Postgres）
@@ -165,6 +173,7 @@ curl -i -X DELETE http://localhost:8001/stock-requests/1
 更完整的示例见：`src/asset/test/api_examples.txt`
 
 ## 错误码约定（后端返回）
+
 - `404 Not Found`：资源不存在（如 `GET/DELETE` 某个 id/pk）
 - `400 Bad Request`：部分插入场景会把数据库约束/外键/唯一键错误映射为 400（如 `daily_klines`、`stock_request_stocks`）
 - `500 Internal Server Error`：连接池/未知 DB 错误等
