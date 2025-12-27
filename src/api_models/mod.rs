@@ -7,5 +7,5 @@ pub mod stock_request_stock;
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
 pub use stock_snapshot::{StockSnapshotResponse, CreateStockSnapshot};
 pub use profit_analysis::{ProfitAnalysisResponse, CreateProfitAnalysis};
-pub use stock_request_stock::CreateStockRequestStock;
+pub use stock_request_stock::{CreateStockRequestStock, StockRequestStockResponse};
 
