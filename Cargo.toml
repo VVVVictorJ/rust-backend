@@ -30,5 +30,5 @@ thiserror = "1.0"
 hashbrown = { version = "0.14", features = ["raw"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-bigdecimal = "0.4"
+bigdecimal = { version = "0.4", features = ["serde"] }
 

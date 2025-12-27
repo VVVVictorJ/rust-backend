@@ -1,35 +1,15 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
     Json,
 };
 use diesel::result::Error as DieselError;
-use serde_json::json;
 
 use crate::api_models::stock_request::{CreateStockRequest, StockRequestResponse};
 use crate::app::AppState;
+use crate::handler::error::AppError;
 use crate::models::NewStockRequest;
 use crate::repositories::stock_request;
-
-#[derive(Debug)]
-pub enum AppError {
-    NotFound,
-    InternalServerError,
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        match self {
-            AppError::NotFound => (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response(),
-            AppError::InternalServerError => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "internal server error"})),
-            )
-                .into_response(),
-        }
-    }
-}
 
 pub async fn create_stock_request(
     State(state): State<AppState>,
