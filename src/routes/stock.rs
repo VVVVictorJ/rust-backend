@@ -2,6 +2,8 @@ use crate::handler::stock::{get_stock, get_filtered_stocks_param};
 use axum::{routing::get, Router};
 use serde_json::{json, Value};
 
+use crate::app::AppState;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct StockQuery {
     pub code: String,
@@ -15,7 +17,7 @@ fn default_source() -> String {
     "em".to_string()
 }
 
-pub fn router() -> Router {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/stock", get(get_stock))
         .route("/stock/filtered/param", get(get_filtered_stocks_param))
