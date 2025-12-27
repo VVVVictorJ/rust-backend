@@ -7,11 +7,19 @@ Header: Content-Type: application/json
 - stock_request_stocks / stock_snapshots 需要存在的 stock_requests.id 作为 request_id
 - profit_analyses 需要存在的 stock_snapshots.id 作为 snapshot_id
 
-1) 创建 stock_request_stock（无返回 ID）
-curl -i -X POST http://localhost:8001/api/stock-request-stocks \
-  -H "Content-Type: application/json" \
-  -d '{"request_id":1,"stock_code":"SH600519"}'
-预期: 201 Created；外键/唯一性错误返回 400
+ 1) 创建 stock_request_stock（无返回 ID）
+ curl -i -X POST http://localhost:8001/api/stock-request-stocks \
+   -H "Content-Type: application/json" \
+   -d '{"request_id":1,"stock_code":"SH600519"}'
+ 预期: 201 Created；外键/唯一性错误返回 400
+ 
+ 1.1) 查询 stock_request_stock（复合主键 request_id + stock_code）
+ curl -i http://localhost:8001/api/stock-request-stocks/2/SH600519
+ 预期: 存在 → 200 OK + {"request_id":1,"stock_code":"SH600519"}；不存在 → 404
+ 
+ 1.2) 删除 stock_request_stock
+ curl -i -X DELETE http://localhost:8001/api/stock-request-stocks/1/SH600519
+ 预期: 存在 → 204 No Content；不存在 → 404
 
 2) 创建 stock_snapshot（返回自增 id）
 curl -i -X POST http://localhost:8001/api/stock-snapshots \
