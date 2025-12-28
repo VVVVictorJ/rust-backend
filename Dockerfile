@@ -5,7 +5,7 @@ FROM rust:1.84-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates build-essential && \
+    apt-get install -y --no-install-recommends pkg-config libssl-dev libpq-dev ca-certificates build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 # 复制清单与锁文件以命中依赖缓存并锁定依赖版本
@@ -22,7 +22,7 @@ FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates libssl3 && \
+    apt-get install -y --no-install-recommends ca-certificates libssl3 libpq5 && \
     rm -rf /var/lib/apt/lists/* && update-ca-certificates
 
 ENV RUST_LOG=info,tower_http=info,axum=info
