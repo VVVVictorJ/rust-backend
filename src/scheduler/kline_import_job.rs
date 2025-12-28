@@ -71,12 +71,41 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     // 5. 遍历股票代码，批量导入K线数据
     let mut success_count = 0;
     let mut failed_count = 0;
+    let mut skipped_count = 0;
     let mut stock_details = Vec::new();
+    
+    // 解析交易日期用于检查
+    let trade_date = chrono::NaiveDate::parse_from_str(&today, "%Y%m%d")
+        .map_err(|e| anyhow::anyhow!("日期解析失败: {}", e))?;
     
     for stock_code in stock_codes.iter() {
         // 移除前缀（SH/SZ）获取纯数字代码
         let pure_code = stock_code.trim_start_matches("SH")
             .trim_start_matches("SZ");
+        
+        // 先检查是否已有当天数据
+        let mut conn = db_pool.get()?;
+        match crate::repositories::daily_kline::exists(&mut conn, pure_code, trade_date) {
+            Ok(true) => {
+                // 已存在，跳过
+                skipped_count += 1;
+                tracing::info!("股票 {} 的 {} 数据已存在，跳过", stock_code, today);
+                stock_details.push(StockImportDetail {
+                    stock_code: stock_code.clone(),
+                    imported_count: 0,
+                    success: true,
+                    error: Some(format!("数据已存在，跳过导入")),
+                });
+                continue;
+            }
+            Ok(false) => {
+                // 不存在，继续导入
+            }
+            Err(e) => {
+                tracing::warn!("检查股票 {} 数据是否存在时出错: {}", stock_code, e);
+                // 出错时继续尝试导入
+            }
+        }
         
         match import_single_stock_kline(
             &client,
@@ -109,9 +138,11 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     }
     
     tracing::info!(
-        "K线导入任务完成，成功: {}, 失败: {}",
+        "K线导入任务完成，总计: {}, 成功: {}, 失败: {}, 跳过: {}",
+        stock_codes.len(),
         success_count,
-        failed_count
+        failed_count,
+        skipped_count
     );
     
     Ok(KlineImportResult {

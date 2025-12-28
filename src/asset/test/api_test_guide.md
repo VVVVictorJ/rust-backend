@@ -741,6 +741,38 @@ curl -i -X POST http://localhost:8001/api/scheduler/trigger-kline-import
 }
 ```
 
+- 有数据被跳过（已存在）:
+
+```json
+{
+  "success": true,
+  "message": "K线导入任务执行完成，总计 3 只股票，成功 3 只，失败 0 只",
+  "total_stocks": 3,
+  "success_count": 3,
+  "failed_count": 0,
+  "details": [
+    {
+      "stock_code": "603819",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300991",
+      "imported_count": 0,
+      "success": true,
+      "error": "数据已存在，跳过导入"
+    },
+    {
+      "stock_code": "300107",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    }
+  ]
+}
+```
+
 - 无股票代码:
 
 ```json
@@ -773,6 +805,7 @@ curl -i -X POST http://localhost:8001/api/scheduler/trigger-kline-import
 - 导入逻辑与定时任务完全相同（每天15:01自动执行）
 - 适用于测试、补录数据或在定时任务时间外手动执行
 - **智能日期处理**：如果是周末，会自动回溯到上周五获取数据
+- **智能去重**：导入前会检查数据库，如果已有当天数据则自动跳过，避免重复导入
 
 ---
 

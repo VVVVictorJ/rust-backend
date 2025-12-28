@@ -30,3 +30,16 @@ pub fn delete_by_pk(conn: &mut PgPoolConn, code: &str, date: NaiveDate) -> Resul
     .execute(conn)
 }
 
+/// 检查指定股票在指定日期是否已有K线数据
+pub fn exists(conn: &mut PgPoolConn, code: &str, date: NaiveDate) -> Result<bool, diesel::result::Error> {
+    use diesel::dsl::exists;
+    use diesel::select;
+    
+    select(exists(
+        daily_klines
+            .filter(stock_code.eq(code))
+            .filter(trade_date.eq(date))
+    ))
+    .get_result(conn)
+}
+
