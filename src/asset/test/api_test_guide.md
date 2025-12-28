@@ -392,7 +392,102 @@ curl -i -X DELETE http://localhost:8001/api/stock-snapshots/1
 
 ## 6. 日K线数据管理
 
-### 6.1 创建日K线数据
+### 6.1 批量导入K线数据（从东方财富）
+
+**接口**: `POST /api/daily-klines/import`
+
+**功能**: 从东方财富网获取指定股票的K线数据并批量导入数据库
+
+**请求体**:
+
+```json
+{
+  "stock_code": "600519",
+  "start_date": "20251201",
+  "end_date": "20251227"
+}
+```
+
+**字段说明**:
+
+- `stock_code`: 股票代码（6位数字，如 `600519`）
+- `start_date`: 开始日期（格式：YYYYMMDD）
+- `end_date`: 结束日期（格式：YYYYMMDD）
+
+**示例**:
+
+```bash
+# 导入贵州茅台 2025年12月的K线数据
+curl -i -X POST http://localhost:8001/api/daily-klines/import \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stock_code": "600519",
+    "start_date": "20251201",
+    "end_date": "20251227"
+  }'
+```
+
+**预期返回**:
+
+- 成功: `200 OK` + JSON 数据
+
+```json
+{
+  "success": true,
+  "stock_code": "600519",
+  "stock_name": "贵州茅台",
+  "total_count": 18,
+  "imported_count": 18,
+  "failed_count": 0,
+  "errors": []
+}
+```
+
+- 部分成功（有重复数据）:
+
+```json
+{
+  "success": true,
+  "stock_code": "600519",
+  "stock_name": "贵州茅台",
+  "total_count": 18,
+  "imported_count": 15,
+  "failed_count": 0,
+  "errors": [
+    "Duplicate entry for 600519 on 2025-12-01",
+    "Duplicate entry for 600519 on 2025-12-02",
+    "Duplicate entry for 600519 on 2025-12-03"
+  ]
+}
+```
+
+- 失败: `400 Bad Request`
+
+```json
+{
+  "error": "Failed to fetch kline data: ..."
+}
+```
+
+**字段说明**:
+
+- `success`: 是否成功（`failed_count == 0` 为 `true`）
+- `stock_code`: 股票代码
+- `stock_name`: 股票名称（从API返回）
+- `total_count`: API返回的K线总数
+- `imported_count`: 成功导入的数量
+- `failed_count`: 导入失败的数量（不包括重复数据）
+- `errors`: 错误和警告信息列表（包括重复数据提示）
+
+**注意事项**:
+
+- 重复数据（同一股票同一日期）不会导入失败，会记录在 `errors` 中但不计入 `failed_count`
+- 导入过程会自动解析东方财富返回的K线数据
+- K线数据格式：日期,开盘,收盘,最高,最低,成交量,成交额...
+
+---
+
+### 6.2 创建日K线数据
 
 **接口**: `POST /api/daily-klines`
 
@@ -435,7 +530,7 @@ curl -i -X POST http://localhost:8001/api/daily-klines \
 
 ---
 
-### 6.2 查询日K线数据
+### 6.3 查询日K线数据
 
 **接口**: `GET /api/daily-klines/:stock_code/:trade_date`
 
@@ -466,7 +561,7 @@ curl -i http://localhost:8001/api/daily-klines/SH600519/2024-01-02
 
 ---
 
-### 6.3 删除日K线数据
+### 6.4 删除日K线数据
 
 **接口**: `DELETE /api/daily-klines/:stock_code/:trade_date`
 
@@ -597,6 +692,8 @@ daily_klines (独立的日K线表)
 
 ## 测试工作流示例
 
+### 工作流 1: 股票筛选 + 盈利分析
+
 ```bash
 # 1. 健康检查
 curl http://localhost:8001/healthz
@@ -641,7 +738,58 @@ curl "http://localhost:8001/api/stock/filtered/param?limit=10"
 # 该接口会自动创建 stock_request 并插入 stock_snapshots
 ```
 
+### 工作流 2: K线数据批量导入
+
+```bash
+# 1. 导入贵州茅台最近一个月的K线数据
+curl -X POST http://localhost:8001/api/daily-klines/import \
+  -H "Content-Type: application/json" \
+  -d '{
+    "stock_code": "600519",
+    "start_date": "20251201",
+    "end_date": "20251227"
+  }'
+# 返回: {"success": true, "imported_count": 18, ...}
+
+# 2. 查询指定日期的K线数据
+curl http://localhost:8001/api/daily-klines/600519/2025-12-27
+
+# 3. 查询单只股票实时数据
+curl "http://localhost:8001/api/stock?code=600519&source=em"
+
+# 4. 删除指定日期的K线数据
+curl -X DELETE http://localhost:8001/api/daily-klines/600519/2025-12-27
+```
+
 ---
 
-**最后更新**: 2025-12-27
+**最后更新**: 2025-12-28
 **后端版本**: rust-backend v0.1.0
+
+## 附录：重构说明
+
+### K线导入接口架构
+
+K线批量导入接口 (`POST /api/daily-klines/import`) 采用分层架构设计：
+
+```
+Handler 层 (daily_kline.rs)
+  ↓ 调用
+Utils 层 (http_client.rs) - 创建 HTTP 客户端
+  ↓
+Service 层 (kline_service.rs) - 业务逻辑
+  ├─ fetch_eastmoney_kline() - 从东方财富获取数据
+  ├─ parse_kline_json() - 解析 JSON 响应
+  └─ fetch_and_parse_kline_data() - 完整流程
+  ↓
+Handler 层 - 批量插入数据库
+  ↓
+Repository 层 (daily_kline.rs) - 数据持久化
+```
+
+**优势**：
+
+- 职责分离，易于维护
+- HTTP 客户端可复用
+- 业务逻辑独立，便于测试
+- 数据解析与网络请求分离
