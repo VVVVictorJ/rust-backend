@@ -15,6 +15,7 @@
 - [5. 股票快照管理](#5-股票快照管理)
 - [6. 日K线数据管理](#6-日k线数据管理)
 - [7. 盈利分析管理](#7-盈利分析管理)
+- [8. 定时任务管理](#8-定时任务管理)
 
 ---
 
@@ -658,6 +659,123 @@ curl -i -X DELETE http://localhost:8001/api/profit-analyses/1
 
 ---
 
+## 8. 定时任务管理
+
+### 8.1 手动触发K线导入任务
+
+**接口**: `POST /api/scheduler/trigger-kline-import`
+
+**功能**: 手动触发K线导入定时任务，立即执行获取当天股票代码并批量导入K线数据的流程
+
+**请求体**: 无需请求体
+
+**示例**:
+
+```bash
+curl -i -X POST http://localhost:8001/api/scheduler/trigger-kline-import
+```
+
+**预期返回**:
+
+- 成功: `200 OK` + JSON 数据
+
+```json
+{
+  "success": true,
+  "message": "K线导入任务执行完成，总计 3 只股票，成功 3 只，失败 0 只",
+  "total_stocks": 3,
+  "success_count": 3,
+  "failed_count": 0,
+  "details": [
+    {
+      "stock_code": "603819",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300991",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300107",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    }
+  ]
+}
+```
+
+- 部分失败:
+
+```json
+{
+  "success": false,
+  "message": "K线导入任务执行完成，总计 3 只股票，成功 2 只，失败 1 只",
+  "total_stocks": 3,
+  "success_count": 2,
+  "failed_count": 1,
+  "details": [
+    {
+      "stock_code": "603819",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300991",
+      "imported_count": 0,
+      "success": false,
+      "error": "Failed to fetch kline data: ..."
+    },
+    {
+      "stock_code": "300107",
+      "imported_count": 1,
+      "success": true,
+      "error": null
+    }
+  ]
+}
+```
+
+- 无股票代码:
+
+```json
+{
+  "success": true,
+  "message": "K线导入任务执行完成，总计 0 只股票，成功 0 只，失败 0 只",
+  "total_stocks": 0,
+  "success_count": 0,
+  "failed_count": 0,
+  "details": []
+}
+```
+
+**字段说明**:
+
+- `success`: 是否全部成功（`failed_count == 0`）
+- `message`: 执行结果描述
+- `total_stocks`: 处理的股票总数
+- `success_count`: 成功导入的股票数
+- `failed_count`: 失败的股票数
+- `details`: 每只股票的详细导入情况
+  - `stock_code`: 股票代码
+  - `imported_count`: 实际导入的K线记录数
+  - `success`: 该股票是否导入成功
+  - `error`: 错误信息（如果失败）
+
+**注意事项**:
+
+- 该接口会立即执行K线导入任务，不受定时任务时间限制
+- 导入逻辑与定时任务完全相同（每天15:01自动执行）
+- 适用于测试、补录数据或在定时任务时间外手动执行
+- **智能日期处理**：如果是周末，会自动回溯到上周五获取数据
+
+---
+
 ## 附录：错误码说明
 
 | 状态码                        | 说明                                        |
@@ -759,6 +877,20 @@ curl "http://localhost:8001/api/stock?code=600519&source=em"
 
 # 4. 删除指定日期的K线数据
 curl -X DELETE http://localhost:8001/api/daily-klines/600519/2025-12-27
+```
+
+### 工作流 3: 手动触发定时任务
+
+```bash
+# 1. 先筛选并入库一些股票
+curl "http://localhost:8001/api/stock/filtered/param?limit=5"
+
+# 2. 手动触发K线导入任务
+curl -X POST http://localhost:8001/api/scheduler/trigger-kline-import
+# 返回: {"success": true, "total_stocks": 5, "success_count": 5, ...}
+
+# 3. 查询导入的K线数据
+curl http://localhost:8001/api/daily-klines/600519/2025-12-28
 ```
 
 ---
