@@ -68,86 +68,92 @@ pub async fn run_profit_analysis_task(db_pool: DbPool) -> anyhow::Result<ProfitA
         });
     }
     
-    // 3. 提取 request_ids
-    let request_ids: Vec<i32> = pending_requests.iter().map(|r| r.id).collect();
-    
-    // 4. 获取昨日创建的快照
-    let yesterday_snapshots = stock_snapshot::find_yesterday_snapshots(&mut conn, &request_ids)?;
-    tracing::info!("找到 {} 个昨日创建的快照", yesterday_snapshots.len());
-    
-    if yesterday_snapshots.is_empty() {
-        tracing::info!("没有昨日创建的快照，跳过盈利分析");
-        return Ok(ProfitAnalysisResult {
-            total_snapshots: 0,
-            analyzed_count: 0,
-            skipped_count: 0,
-            no_kline_count: 0,
-            snapshot_details: Vec::new(),
-        });
-    }
-    
-    // 5. 获取今日交易日期（智能处理周末）
-    let today_trade_date = get_trading_date();
-    tracing::info!("交易日期: {}", today_trade_date);
-    
-    // 6. 遍历快照，计算盈利指标
+    // 3. 遍历每个请求，处理其下的快照
+    let mut total_snapshots = 0;
     let mut analyzed_count = 0;
     let mut skipped_count = 0;
     let mut no_kline_count = 0;
     let mut snapshot_details = Vec::new();
-    let mut processed_request_ids = std::collections::HashSet::new();
     
-    for snapshot in yesterday_snapshots.iter() {
-        let result = analyze_single_snapshot(&db_pool, snapshot, today_trade_date).await;
-        
-        match result {
-            Ok(detail) => {
-                if detail.success {
-                    if detail.error.is_some() && detail.error.as_ref().unwrap().contains("已存在") {
-                        skipped_count += 1;
-                    } else if detail.error.is_some() && detail.error.as_ref().unwrap().contains("K线") {
-                        no_kline_count += 1;
-                    } else {
-                        analyzed_count += 1;
-                    }
-                }
-                processed_request_ids.insert(snapshot.request_id);
-                snapshot_details.push(detail);
+    for request in pending_requests.iter() {
+        // 3.1 检查 time_range_start 是否存在
+        let time_range_start = match request.time_range_start {
+            Some(start) => start,
+            None => {
+                tracing::warn!("请求 {} 没有设置 time_range_start，跳过", request.id);
+                continue;
             }
-            Err(e) => {
-                tracing::error!("分析快照 {} 失败: {}", snapshot.stock_code, e);
-                snapshot_details.push(SnapshotAnalysisDetail {
-                    stock_code: snapshot.stock_code.clone(),
-                    stock_name: snapshot.stock_name.clone(),
-                    profit_rate: -1,
-                    success: false,
-                    error: Some(e.to_string()),
-                });
+        };
+        
+        // 3.2 计算 K线日期 = time_range_start + 1 天（智能处理周末）
+        let kline_date = get_next_trading_date(time_range_start);
+        tracing::info!(
+            "请求 {}: time_range_start={}, K线日期={}",
+            request.id, time_range_start, kline_date
+        );
+        
+        // 3.3 获取该请求下的所有快照
+        let mut conn = db_pool.get()?;
+        let snapshots = stock_snapshot::find_by_request_id(&mut conn, request.id)?;
+        tracing::info!("请求 {} 下有 {} 个快照", request.id, snapshots.len());
+        
+        if snapshots.is_empty() {
+            tracing::info!("请求 {} 没有快照，跳过", request.id);
+            continue;
+        }
+        
+        total_snapshots += snapshots.len();
+        
+        // 3.4 遍历快照，计算盈利指标
+        for snapshot in snapshots.iter() {
+            let result = analyze_single_snapshot(&db_pool, snapshot, kline_date).await;
+            
+            match result {
+                Ok(detail) => {
+                    if detail.success {
+                        if detail.error.is_some() && detail.error.as_ref().unwrap().contains("已存在") {
+                            skipped_count += 1;
+                        } else if detail.error.is_some() && detail.error.as_ref().unwrap().contains("K线") {
+                            no_kline_count += 1;
+                        } else {
+                            analyzed_count += 1;
+                        }
+                    }
+                    snapshot_details.push(detail);
+                }
+                Err(e) => {
+                    tracing::error!("分析快照 {} 失败: {}", snapshot.stock_code, e);
+                    snapshot_details.push(SnapshotAnalysisDetail {
+                        stock_code: snapshot.stock_code.clone(),
+                        stock_name: snapshot.stock_name.clone(),
+                        profit_rate: -1,
+                        success: false,
+                        error: Some(e.to_string()),
+                    });
+                }
             }
         }
-    }
-    
-    // 7. 更新已处理请求的 time_range_end
-    let today = Local::now().date_naive();
-    for req_id in processed_request_ids {
+        
+        // 3.5 更新该请求的 time_range_end
+        let today = Local::now().date_naive();
         let mut conn = db_pool.get()?;
-        if let Err(e) = stock_request::update_time_range_end(&mut conn, req_id, today) {
-            tracing::warn!("更新请求 {} 的 time_range_end 失败: {}", req_id, e);
+        if let Err(e) = stock_request::update_time_range_end(&mut conn, request.id, today) {
+            tracing::warn!("更新请求 {} 的 time_range_end 失败: {}", request.id, e);
         } else {
-            tracing::info!("已更新请求 {} 的 time_range_end 为 {}", req_id, today);
+            tracing::info!("已更新请求 {} 的 time_range_end 为 {}", request.id, today);
         }
     }
     
     tracing::info!(
         "盈利分析任务完成，总计: {}, 分析: {}, 跳过: {}, 无K线: {}",
-        yesterday_snapshots.len(),
+        total_snapshots,
         analyzed_count,
         skipped_count,
         no_kline_count
     );
     
     Ok(ProfitAnalysisResult {
-        total_snapshots: yesterday_snapshots.len(),
+        total_snapshots,
         analyzed_count,
         skipped_count,
         no_kline_count,
@@ -243,17 +249,15 @@ async fn analyze_single_snapshot(
     })
 }
 
-/// 获取交易日期：如果是周末则返回上周五，否则返回当天
-fn get_trading_date() -> NaiveDate {
-    let now = Local::now();
-    let weekday = now.weekday();
+/// 获取下一个交易日期：基于给定日期 + 1 天，如果是周末则顺延到周一
+fn get_next_trading_date(base_date: NaiveDate) -> NaiveDate {
+    let next_day = base_date + chrono::Days::new(1);
+    let weekday = next_day.weekday();
     
-    let trading_date = match weekday {
-        Weekday::Sat => now.date_naive() - chrono::Days::new(1), // 周六 -> 周五
-        Weekday::Sun => now.date_naive() - chrono::Days::new(2), // 周日 -> 周五
-        _ => now.date_naive(), // 工作日使用当天
-    };
-    
-    trading_date
+    match weekday {
+        Weekday::Sat => next_day + chrono::Days::new(2), // 周六 -> 周一
+        Weekday::Sun => next_day + chrono::Days::new(1), // 周日 -> 周一
+        _ => next_day, // 工作日直接使用
+    }
 }
 

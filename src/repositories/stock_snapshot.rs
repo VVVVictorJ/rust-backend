@@ -24,7 +24,6 @@ pub fn create(conn: &mut PgPoolConn, new_rec: &NewStockSnapshot) -> Result<i32, 
 }
 
 /// 根据 request_id 获取所有快照
-#[allow(dead_code)]
 pub fn find_by_request_id(conn: &mut PgPoolConn, req_id: i32) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
     stock_snapshots
         .filter(request_id.eq(req_id))
@@ -32,6 +31,7 @@ pub fn find_by_request_id(conn: &mut PgPoolConn, req_id: i32) -> Result<Vec<Stoc
 }
 
 /// 获取昨日（UTC+8 时区）创建的快照，根据 request_ids 过滤
+#[allow(dead_code)]
 pub fn find_yesterday_snapshots(conn: &mut PgPoolConn, request_ids: &[i32]) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
     if request_ids.is_empty() {
         return Ok(Vec::new());

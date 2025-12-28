@@ -929,9 +929,9 @@ profit_low = 入场价 × 1.05 (原价+5%)
 
 - 该接口会立即执行盈利分析任务，不受定时任务时间限制
 - 分析逻辑与定时任务完全相同（每天15:30自动执行）
-- 只处理昨日创建的快照（`stock_snapshots.created_at` 在昨天）
 - 对应的 `stock_requests.time_range_end` 必须为空（未处理）
-- **智能日期处理**：如果是周末，会使用上周五的K线数据
+- **K线日期计算**：使用 `stock_requests.time_range_start + 1 天` 作为K线查询日期
+- **智能日期处理**：如果 time_range_start + 1 是周末，会顺延到周一
 - **智能去重**：已存在分析记录的快照会自动跳过
 - 分析完成后会自动更新 `stock_requests.time_range_end` 标记处理完成
 
@@ -1082,13 +1082,15 @@ curl http://localhost:8001/api/profit-analyses/1
 **盈利分析流程说明**:
 
 1. **第一天（工作日）**：使用 `/api/stock/filtered/param` 筛选股票
-   - 系统自动创建 `stock_request` 记录（`time_range_end` 为空）
+   - 系统自动创建 `stock_request` 记录
+   - `time_range_start` 设置为当天日期，`time_range_end` 为空
    - 系统自动将筛选结果存入 `stock_snapshots`，记录入场价
 
 2. **第二天（工作日）15:30**：定时任务自动执行盈利分析
    - 查找 `time_range_end` 为空的请求
-   - 获取昨日创建的快照
-   - 用快照的入场价与今日K线的最高价/收盘价比较
+   - 获取每个请求下的所有快照（通过 `request_id` 关联）
+   - **K线日期 = time_range_start + 1 天**（周末顺延到周一）
+   - 用快照的入场价与该日K线的最高价/收盘价比较
    - 计算 `profit_rate`（0/1/2）并写入 `profit_analysis`
    - 更新 `time_range_end` 标记处理完成
 
