@@ -16,6 +16,7 @@ pub struct AppState {
     pub db_pool: DbPool,
 }
 
+#[allow(dead_code)]
 pub fn build_app() -> Router {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
     let manager = ConnectionManager::<PgConnection>::new(database_url);

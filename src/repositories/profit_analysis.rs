@@ -22,3 +22,16 @@ pub fn create(conn: &mut PgPoolConn, new_rec: &NewProfitAnalysis) -> Result<i32,
         .get_result(conn)
 }
 
+/// 检查是否已存在指定快照和策略的分析记录（避免重复）
+pub fn exists_for_snapshot(conn: &mut PgPoolConn, snap_id: i32, strategy: &str) -> Result<bool, diesel::result::Error> {
+    use diesel::dsl::exists;
+    use diesel::select;
+    
+    select(exists(
+        profit_analysis
+            .filter(snapshot_id.eq(snap_id))
+            .filter(strategy_name.eq(strategy))
+    ))
+    .get_result(conn)
+}
+

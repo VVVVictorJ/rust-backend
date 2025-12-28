@@ -33,6 +33,10 @@ async fn main() {
         tracing::error!("创建K线导入任务失败: {}", e);
     }
     
+    if let Err(e) = scheduler::profit_analysis_job::create_profit_analysis_job(&scheduler, db_pool.clone()).await {
+        tracing::error!("创建盈利分析任务失败: {}", e);
+    }
+    
     scheduler.start().await.expect("启动调度器失败");
     tracing::info!("定时任务调度器已启动");
     

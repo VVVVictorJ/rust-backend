@@ -23,6 +23,45 @@ pub fn create(conn: &mut PgPoolConn, new_rec: &NewStockSnapshot) -> Result<i32, 
         .get_result(conn)
 }
 
+/// 根据 request_id 获取所有快照
+#[allow(dead_code)]
+pub fn find_by_request_id(conn: &mut PgPoolConn, req_id: i32) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
+    stock_snapshots
+        .filter(request_id.eq(req_id))
+        .load::<StockSnapshot>(conn)
+}
+
+/// 获取昨日（UTC+8 时区）创建的快照，根据 request_ids 过滤
+pub fn find_yesterday_snapshots(conn: &mut PgPoolConn, request_ids: &[i32]) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
+    if request_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    
+    // 使用 UTC+8 时区（东八区，北京时间）
+    let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
+    let now_local = Utc::now().with_timezone(&utc_plus_8);
+    
+    // 获取昨天的日期范围
+    let yesterday = now_local.date_naive() - chrono::Days::new(1);
+    let yesterday_start_local = yesterday.and_hms_opt(0, 0, 0).unwrap();
+    let yesterday_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
+        yesterday_start_local - chrono::Duration::hours(8),
+        Utc
+    );
+    
+    let today_start_local = now_local.date_naive().and_hms_opt(0, 0, 0).unwrap();
+    let today_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
+        today_start_local - chrono::Duration::hours(8),
+        Utc
+    );
+    
+    stock_snapshots
+        .filter(request_id.eq_any(request_ids))
+        .filter(created_at.ge(yesterday_start_utc))
+        .filter(created_at.lt(today_start_utc))
+        .load::<StockSnapshot>(conn)
+}
+
 /// 查询当天（UTC+8 时区）创建的所有不重复股票代码
 pub fn get_distinct_codes_today(conn: &mut PgPoolConn) -> Result<Vec<String>, diesel::result::Error> {
     // 使用 UTC+8 时区（东八区，北京时间）

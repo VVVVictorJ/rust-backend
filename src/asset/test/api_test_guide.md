@@ -809,6 +809,134 @@ curl -i -X POST http://localhost:8001/api/scheduler/trigger-kline-import
 
 ---
 
+### 8.2 手动触发盈利分析任务
+
+**接口**: `POST /api/scheduler/trigger-profit-analysis`
+
+**功能**: 手动触发盈利分析定时任务，分析昨日入库的股票快照与今日K线数据的盈利情况
+
+**请求体**: 无需请求体
+
+**示例**:
+
+```bash
+curl -i -X POST http://localhost:8001/api/scheduler/trigger-profit-analysis
+```
+
+**预期返回**:
+
+- 成功: `200 OK` + JSON 数据
+
+```json
+{
+  "success": true,
+  "message": "盈利分析任务执行完成，总计 3 个快照，分析 3 个，跳过 0 个，无K线 0 个",
+  "total_snapshots": 3,
+  "analyzed_count": 3,
+  "skipped_count": 0,
+  "no_kline_count": 0,
+  "details": [
+    {
+      "stock_code": "603819",
+      "stock_name": "神力股份",
+      "profit_rate": 2,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300991",
+      "stock_name": "创益通",
+      "profit_rate": 1,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300107",
+      "stock_name": "建新股份",
+      "profit_rate": 0,
+      "success": true,
+      "error": null
+    }
+  ]
+}
+```
+
+- 有快照被跳过（已分析或无K线）:
+
+```json
+{
+  "success": true,
+  "message": "盈利分析任务执行完成，总计 3 个快照，分析 1 个，跳过 1 个，无K线 1 个",
+  "total_snapshots": 3,
+  "analyzed_count": 1,
+  "skipped_count": 1,
+  "no_kline_count": 1,
+  "details": [
+    {
+      "stock_code": "603819",
+      "stock_name": "神力股份",
+      "profit_rate": 2,
+      "success": true,
+      "error": null
+    },
+    {
+      "stock_code": "300991",
+      "stock_name": "创益通",
+      "profit_rate": -1,
+      "success": true,
+      "error": "分析记录已存在，跳过"
+    },
+    {
+      "stock_code": "300107",
+      "stock_name": "建新股份",
+      "profit_rate": -1,
+      "success": true,
+      "error": "2025-12-28的K线数据不存在"
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+- `success`: 是否成功执行
+- `message`: 执行结果描述
+- `total_snapshots`: 处理的快照总数
+- `analyzed_count`: 成功分析的快照数
+- `skipped_count`: 跳过的快照数（已有分析记录）
+- `no_kline_count`: 因无K线数据跳过的快照数
+- `details`: 每个快照的详细分析情况
+  - `stock_code`: 股票代码
+  - `stock_name`: 股票名称
+  - `profit_rate`: 盈利指标（0/1/2，-1表示未分析）
+  - `success`: 是否处理成功
+  - `error`: 错误/提示信息
+
+**盈利指标说明**:
+
+```
+入场价 = stock_snapshots.latest_price
+profit_high = 入场价 × 1.10 (原价+10%)
+profit_low = 入场价 × 1.05 (原价+5%)
+
+判断规则：
+├─ high >= profit_high 且 close >= profit_low → profit_rate = 2
+├─ high >= profit_low 但 close < profit_low → profit_rate = 1
+└─ high < profit_low → profit_rate = 0
+```
+
+**注意事项**:
+
+- 该接口会立即执行盈利分析任务，不受定时任务时间限制
+- 分析逻辑与定时任务完全相同（每天15:30自动执行）
+- 只处理昨日创建的快照（`stock_snapshots.created_at` 在昨天）
+- 对应的 `stock_requests.time_range_end` 必须为空（未处理）
+- **智能日期处理**：如果是周末，会使用上周五的K线数据
+- **智能去重**：已存在分析记录的快照会自动跳过
+- 分析完成后会自动更新 `stock_requests.time_range_end` 标记处理完成
+
+---
+
 ## 附录：错误码说明
 
 | 状态码                        | 说明                                        |
@@ -912,7 +1040,7 @@ curl "http://localhost:8001/api/stock?code=600519&source=em"
 curl -X DELETE http://localhost:8001/api/daily-klines/600519/2025-12-27
 ```
 
-### 工作流 3: 手动触发定时任务
+### 工作流 3: 手动触发K线导入任务
 
 ```bash
 # 1. 先筛选并入库一些股票
@@ -925,6 +1053,49 @@ curl -X POST http://localhost:8001/api/scheduler/trigger-kline-import
 # 3. 查询导入的K线数据
 curl http://localhost:8001/api/daily-klines/600519/2025-12-28
 ```
+
+### 工作流 4: 完整盈利分析流程
+
+```bash
+# ========== 第一天：筛选入库股票 ==========
+
+# 1. 使用筛选接口入库股票（自动创建 stock_request 和 stock_snapshots）
+curl "http://localhost:8001/api/stock/filtered/param?limit=5"
+# 返回: {"count": 5, "items": [...]}
+# 此时 stock_requests.time_range_end 为空
+
+# ========== 第二天：执行盈利分析 ==========
+
+# 2. 先确保今日K线数据已导入
+curl -X POST http://localhost:8001/api/scheduler/trigger-kline-import
+# 返回: {"success": true, "total_stocks": 5, ...}
+
+# 3. 手动触发盈利分析任务
+curl -X POST http://localhost:8001/api/scheduler/trigger-profit-analysis
+# 返回: {"success": true, "total_snapshots": 5, "analyzed_count": 5, ...}
+
+# 4. 查询盈利分析结果
+curl http://localhost:8001/api/profit-analyses/1
+# 返回: {"id": 1, "snapshot_id": 1, "strategy_name": "OHLC", "profit_rate": "2.00", ...}
+```
+
+**盈利分析流程说明**:
+
+1. **第一天（工作日）**：使用 `/api/stock/filtered/param` 筛选股票
+   - 系统自动创建 `stock_request` 记录（`time_range_end` 为空）
+   - 系统自动将筛选结果存入 `stock_snapshots`，记录入场价
+
+2. **第二天（工作日）15:30**：定时任务自动执行盈利分析
+   - 查找 `time_range_end` 为空的请求
+   - 获取昨日创建的快照
+   - 用快照的入场价与今日K线的最高价/收盘价比较
+   - 计算 `profit_rate`（0/1/2）并写入 `profit_analysis`
+   - 更新 `time_range_end` 标记处理完成
+
+3. **盈利指标含义**:
+   - `profit_rate = 2`: 高收益（最高价≥+10%，收盘价≥+5%）
+   - `profit_rate = 1`: 中收益（最高价≥+5%，收盘价<+5%）
+   - `profit_rate = 0`: 低收益（最高价<+5%）
 
 ---
 
