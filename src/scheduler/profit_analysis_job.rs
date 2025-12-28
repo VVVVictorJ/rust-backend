@@ -32,7 +32,7 @@ pub async fn create_profit_analysis_job(
     db_pool: DbPool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // 创建每天15:30执行的任务
-    let job = Job::new_async("0 30 15 * * *", move |_uuid, _l| {
+    let job = Job::new_async("0 40 15 * * *", move |_uuid, _l| {
         let pool = db_pool.clone();
         Box::pin(async move {
             if let Err(e) = run_profit_analysis_task(pool).await {
