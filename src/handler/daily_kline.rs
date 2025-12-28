@@ -89,7 +89,7 @@ pub async fn kline_import(
         &payload.end_date,
     )
     .await
-    .map_err(|e| AppError::BadRequest(format!("Failed to fetch kline data: {}", e)))?;
+    .map_err(|e| AppError::BadRequest(format!("Failed to fetch kline data: {e}")))?;
 
     // 3. 获取数据库连接
     let mut conn = state

@@ -196,7 +196,7 @@ async fn analyze_single_snapshot(
                 stock_name: snapshot.stock_name.clone(),
                 profit_rate: -1,
                 success: true,
-                error: Some(format!("{}的K线数据不存在", trade_date)),
+                error: Some(format!("{trade_date}的K线数据不存在")),
             });
         }
         Err(e) => return Err(e.into()),

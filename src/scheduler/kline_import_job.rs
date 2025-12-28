@@ -76,7 +76,7 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     
     // 解析交易日期用于检查
     let trade_date = chrono::NaiveDate::parse_from_str(&today, "%Y%m%d")
-        .map_err(|e| anyhow::anyhow!("日期解析失败: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("日期解析失败: {e}"))?;
     
     for stock_code in stock_codes.iter() {
         // 移除前缀（SH/SZ）获取纯数字代码
@@ -94,7 +94,7 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
                     stock_code: stock_code.clone(),
                     imported_count: 0,
                     success: true,
-                    error: Some(format!("数据已存在，跳过导入")),
+                    error: Some("数据已存在，跳过导入".to_string()),
                 });
                 continue;
             }

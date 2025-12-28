@@ -49,8 +49,7 @@ pub async fn fetch_eastmoney_kline(
     let _timestamp = chrono::Utc::now().timestamp_millis().to_string();
 
     let url = format!(
-        "{}?secid={}&ut={}&fields1={}&fields2={}&klt={}&fqt={}&beg={}&end={}&smplmt={}&lmt={}&_={}",
-        EM_KLINE_URL, secid, ut, fields1, fields2, klt, fqt, beg_date, end_date, smplmt, lmt, _timestamp
+        "{EM_KLINE_URL}?secid={secid}&ut={ut}&fields1={fields1}&fields2={fields2}&klt={klt}&fqt={fqt}&beg={beg_date}&end={end_date}&smplmt={smplmt}&lmt={lmt}&_={_timestamp}"
     );
 
     let resp = client.get(&url).send().await?;
@@ -89,7 +88,7 @@ pub fn parse_kline_json(json_data: &Value) -> Result<KlineParseResult, KlineServ
         if let Some(kline) = kline_str.as_str() {
             match parse_single_kline_str(&stock_code, kline) {
                 Ok(kline_data) => parsed.push(kline_data),
-                Err(e) => errors.push(format!("Parse error for '{}': {}", kline, e)),
+                Err(e) => errors.push(format!("Parse error for '{kline}': {e}")),
             }
         }
     }
