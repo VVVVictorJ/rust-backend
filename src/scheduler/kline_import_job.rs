@@ -4,6 +4,7 @@ use crate::repositories::stock_snapshot;
 use crate::services::kline_service;
 use crate::utils::http_client;
 use chrono::Local;
+use tokio::time::{sleep, Duration};
 
 /// K线导入任务执行结果
 #[derive(Debug)]
@@ -78,7 +79,7 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     let trade_date = chrono::NaiveDate::parse_from_str(&today, "%Y%m%d")
         .map_err(|e| anyhow::anyhow!("日期解析失败: {e}"))?;
     
-    for stock_code in stock_codes.iter() {
+    for (index, stock_code) in stock_codes.iter().enumerate() {
         // 移除前缀（SH/SZ）获取纯数字代码
         let pure_code = stock_code.trim_start_matches("SH")
             .trim_start_matches("SZ");
@@ -134,6 +135,14 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
                     error: Some(error_msg),
                 });
             }
+        }
+        
+        // 添加随机延迟，避免频繁请求被封IP（最后一个股票不需要延迟）
+        if index < stock_codes.len() - 1 {
+            // 随机延迟 2-5 秒
+            let delay_ms = rand::random::<u64>() % 3001 + 2000; // 2000-5000ms
+            tracing::debug!("等待 {} 毫秒后处理下一个股票", delay_ms);
+            sleep(Duration::from_millis(delay_ms)).await;
         }
     }
     

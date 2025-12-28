@@ -2075,6 +2075,7 @@ dependencies = [
  "hashbrown 0.14.5",
  "polars",
  "r2d2",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
