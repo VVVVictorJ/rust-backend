@@ -33,4 +33,5 @@ chrono = { version = "0.4", features = ["serde"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 tokio-cron-scheduler = "0.10"
 rand = "0.8"
+tracing-appender = "0.2"
 
