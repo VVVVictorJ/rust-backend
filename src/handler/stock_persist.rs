@@ -78,7 +78,7 @@ async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn 
     let new_request = NewStockRequest {
         strategy_name: Some("filtered_param".to_string()),
         time_range_start: Some(now_date),
-        time_range_end: Some(now_date),
+        time_range_end: None,  // 待处理，收益分析完成后才设置
     };
     let created_request = stock_request::create(&mut conn, &new_request)?;
     let request_id = created_request.id;
