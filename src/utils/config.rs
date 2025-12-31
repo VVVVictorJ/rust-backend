@@ -6,7 +6,7 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     pub fn from_env() -> Self {
-        let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
         let port: u16 = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse().ok())
