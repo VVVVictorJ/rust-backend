@@ -53,7 +53,7 @@ pub fn query_by_trade_date(
         FROM stock_snapshots a 
         LEFT JOIN daily_klines dk ON a.stock_code = dk.stock_code 
         WHERE a.main_force_inflow > 0
-          AND a.created_at::date = dk.trade_date 
+          AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = dk.trade_date 
           AND dk.trade_date = $1
         ORDER BY a.main_force_inflow DESC
         LIMIT $2 OFFSET $3
@@ -82,7 +82,7 @@ pub fn count_by_trade_date(
         FROM stock_snapshots a 
         LEFT JOIN daily_klines dk ON a.stock_code = dk.stock_code 
         WHERE a.main_force_inflow > 0
-          AND a.created_at::date = dk.trade_date 
+          AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = dk.trade_date 
           AND dk.trade_date = $1
     "#;
 
