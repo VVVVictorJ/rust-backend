@@ -4,4 +4,5 @@ pub mod profit_analysis;
 pub mod stock_request_stock;
 pub mod daily_kline;
 pub mod stock_trade_date_query;
+pub mod stock_price_compare;
 

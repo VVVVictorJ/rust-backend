@@ -11,6 +11,7 @@ mod stock_request_stock;
 mod daily_kline;
 mod scheduler;
 mod stock_trade_date_query;
+mod stock_price_compare;
 
 pub fn build_routes() -> Router<AppState> {
     let api_router = Router::new()
@@ -20,7 +21,8 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/profit-analyses", profit_analysis::router())
         .nest("/daily-klines", daily_kline::router())
         .nest("/scheduler", scheduler::router())
-        .nest("/stock-trade-date-query", stock_trade_date_query::router());
+        .nest("/stock-trade-date-query", stock_trade_date_query::router())
+        .nest("/stock-price-compare", stock_price_compare::router());
 
     Router::new()
         // 根路径与健康检查

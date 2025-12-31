@@ -43,3 +43,13 @@ pub fn exists(conn: &mut PgPoolConn, code: &str, date: NaiveDate) -> Result<bool
     .get_result(conn)
 }
 
+/// 查询指定日期之前最近的交易日期（处理节假日）
+pub fn find_previous_trade_date(conn: &mut PgPoolConn, date: NaiveDate) -> Result<Option<NaiveDate>, diesel::result::Error> {
+    daily_klines
+        .select(trade_date)
+        .filter(trade_date.lt(date))
+        .order(trade_date.desc())
+        .first::<NaiveDate>(conn)
+        .optional()
+}
+

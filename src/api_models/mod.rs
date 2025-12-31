@@ -6,6 +6,7 @@ pub mod stock_request_stock;
 pub mod daily_kline;
 pub mod kline_import;
 pub mod stock_trade_date_query;
+pub mod stock_price_compare;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -21,4 +22,6 @@ pub use daily_kline::{CreateDailyKline, DailyKlineResponse};
 pub use kline_import::{ImportKlineRequest, ImportKlineResponse};
 #[allow(unused_imports)]
 pub use stock_trade_date_query::{TradeDateQueryRequest, TradeDateQueryItem, TradeDateQueryResponse};
+#[allow(unused_imports)]
+pub use stock_price_compare::{PriceCompareRequest, PriceCompareItem, PriceCompareResponse};
 
