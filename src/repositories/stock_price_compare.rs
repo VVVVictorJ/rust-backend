@@ -83,13 +83,29 @@ pub fn count_price_compare(
     }
 
     let query = r#"
-        SELECT COUNT(DISTINCT b.stock_code) as count
-        FROM profit_analysis a 
-        LEFT JOIN stock_snapshots b ON a.snapshot_id = b.id 
-        LEFT JOIN daily_klines c ON b.stock_code = c.stock_code 
-        WHERE a.profit_rate IN (1, 2) 
-          AND b.created_at::date = $1
-          AND c.trade_date = $2
+        SELECT COUNT(*) as count
+        FROM (
+            SELECT DISTINCT 
+                b.stock_code,
+                b.stock_name,
+                b.latest_price,
+                c.high_price,
+                c.close_price,
+                c.open_price,
+                c.low_price,
+                CASE 
+                    WHEN a.profit_rate = 2 THEN 'A'
+                    WHEN a.profit_rate = 1 THEN 'B'
+                    ELSE 'C'
+                END as grade,
+                b.created_at 
+            FROM profit_analysis a 
+            LEFT JOIN stock_snapshots b ON a.snapshot_id = b.id 
+            LEFT JOIN daily_klines c ON b.stock_code = c.stock_code 
+            WHERE a.profit_rate IN (1, 2) 
+              AND b.created_at::date = $1
+              AND c.trade_date = $2
+        ) AS distinct_results
     "#;
 
     let result = diesel::sql_query(query)

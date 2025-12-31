@@ -66,6 +66,32 @@ pub async fn query_price_compare(
             AppError::InternalServerError
         })?;
 
+    // #region agent log
+    {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        let log_data = serde_json::json!({
+            "location": "stock_price_compare.rs:63",
+            "message": "COUNT查询结果",
+            "data": {
+                "total": total,
+                "snapshot_date": snapshot_date.to_string(),
+                "trade_date": trade_date.to_string(),
+                "page": payload.page,
+                "page_size": payload.page_size,
+                "offset": offset
+            },
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+            "sessionId": "debug-session",
+            "runId": "post-fix",
+            "hypothesisId": "A,B"
+        });
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("e:\\code\\python\\stockProject\\.cursor\\debug.log") {
+            let _ = writeln!(file, "{}", log_data.to_string());
+        }
+    }
+    // #endregion
+
     // 查询数据
     let results = stock_price_compare::query_price_compare(
         &mut conn,
@@ -78,6 +104,32 @@ pub async fn query_price_compare(
         tracing::error!("Failed to query data: {}", e);
         AppError::InternalServerError
     })?;
+
+    // #region agent log
+    {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        let stock_codes: Vec<String> = results.iter().map(|r| r.stock_code.clone()).collect();
+        let unique_codes: std::collections::HashSet<_> = stock_codes.iter().collect();
+        let log_data = serde_json::json!({
+            "location": "stock_price_compare.rs:70",
+            "message": "实际查询结果",
+            "data": {
+                "results_count": results.len(),
+                "stock_codes": stock_codes,
+                "unique_stock_codes_count": unique_codes.len(),
+                "has_duplicates": results.len() != unique_codes.len()
+            },
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+            "sessionId": "debug-session",
+            "runId": "post-fix",
+            "hypothesisId": "A,B"
+        });
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("e:\\code\\python\\stockProject\\.cursor\\debug.log") {
+            let _ = writeln!(file, "{}", log_data.to_string());
+        }
+    }
+    // #endregion
 
     // 转换结果
     let data = results
