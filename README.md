@@ -43,12 +43,45 @@
 - **POST** `/api/daily-klines`
 - **GET/DELETE** `/api/daily-klines/:stock_code/:trade_date`
 
+### 股票数据查询（复杂查询）
+
+- **POST** `/api/stock-trade-date-query`
+  - 根据交易日期查询股票快照数据（支持分页）
+  - 请求体：`{"trade_date": "YYYY-MM-DD", "page": 1, "page_size": 20}`
+  - 返回：快照数据列表 + 分页信息（total、total_pages）
+
+- **POST** `/api/stock-price-compare`
+  - 查询带盈利等级的股票价格对比数据（支持分页）
+  - 请求体：`{"trade_date": "YYYY-MM-DD", "page": 1, "page_size": 20}`
+  - 自动计算前一个交易日（考虑周末和节假日）
+  - 返回：股票数据 + 盈利等级（A/B/C）+ 分页信息
+
+### 定时任务管理
+
+- **POST** `/api/scheduler/trigger-kline-import`
+  - 手动触发 K线导入任务
+  - 功能：获取当天入库的股票代码并批量导入K线数据
+  - 无需请求体
+  - 返回：执行结果统计（total_stocks、success_count、failed_count、details）
+
+- **POST** `/api/scheduler/trigger-profit-analysis`
+  - 手动触发盈利分析任务
+  - 功能：分析昨日快照与今日K线的盈利情况
+  - 无需请求体
+  - 返回：执行结果统计（total_snapshots、analyzed_count、details）
+
+> **定时任务说明**：
+> - K线导入任务：每天北京时间 **15:01** 自动执行（使用 Asia/Shanghai 时区）
+> - 盈利分析任务：每天北京时间 **15:40** 自动执行（使用 Asia/Shanghai 时区）
+> - 支持通过 API 手动触发，适用于测试或补录数据
+
 ## 技术栈
 
 - **Web**：`axum 0.7`、`tokio`、`tower-http`（Trace/CORS）
 - **DB**：`diesel 2.x` + `r2d2`（Postgres）
 - **HTTP Client**：`reqwest`（gzip）
 - **数据处理**：`polars`（lazy/filter）
+- **定时任务**：`tokio-cron-scheduler`、`chrono-tz`（时区支持）
 - **配置/日志**：`dotenvy`、`tracing` + `tracing-subscriber`
 
 ## 目录结构（关键部分）
@@ -59,8 +92,12 @@
 - `src/repositories/`：Diesel 查询/插入/删除
 - `src/models/` + `src/schema.rs`：数据库模型与 Diesel schema
 - `src/services/stock_filter.rs`：批量股票抓取 + polars 条件筛选
+- `src/scheduler/`：定时任务定义（K线导入、盈利分析）
+  - `kline_import_job.rs`：每天 15:01 自动导入K线数据
+  - `profit_analysis_job.rs`：每天 15:40 自动执行盈利分析
 - `src/asset/DDL/stock_create.sql`：数据库建表 SQL（当前仓库未提供 `migrations/` 目录）
 - `src/asset/test/api_examples.txt`：更多 curl 示例
+- `src/asset/test/api_test_guide.md`：完整的 API 测试指南
 
 ## 配置（环境变量）
 
@@ -168,9 +205,38 @@ curl -i http://localhost:8001/stock-requests/1
 curl -i -X DELETE http://localhost:8001/stock-requests/1
 ```
 
-### 4) 其他 CRUD 示例
+### 4) 交易日查询
 
-更完整的示例见：`src/asset/test/api_examples.txt`
+```bash
+# 查询 2025-12-30 的股票快照数据（第1页，每页20条）
+curl -X POST http://localhost:8001/api/stock-trade-date-query \
+  -H "Content-Type: application/json" \
+  -d '{"trade_date":"2025-12-30","page":1,"page_size":20}'
+```
+
+### 5) 价格对比查询（带盈利等级）
+
+```bash
+# 查询 2025-12-30 的价格对比数据
+# 自动查询前一个交易日的快照数据并对比
+curl -X POST http://localhost:8001/api/stock-price-compare \
+  -H "Content-Type: application/json" \
+  -d '{"trade_date":"2025-12-30","page":1,"page_size":20}'
+```
+
+### 6) 手动触发定时任务
+
+```bash
+# 手动触发 K线导入任务
+curl -X POST http://localhost:8001/api/scheduler/trigger-kline-import
+
+# 手动触发盈利分析任务
+curl -X POST http://localhost:8001/api/scheduler/trigger-profit-analysis
+```
+
+### 7) 其他 CRUD 示例
+
+更完整的示例见：`src/asset/test/api_examples.txt` 和 `src/asset/test/api_test_guide.md`
 
 ## 错误码约定（后端返回）
 
