@@ -56,6 +56,24 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    job_execution_history (id) {
+        id -> Int4,
+        job_name -> Varchar,
+        status -> Varchar,
+        started_at -> Timestamp,
+        completed_at -> Nullable<Timestamp>,
+        total_count -> Int4,
+        success_count -> Int4,
+        failed_count -> Int4,
+        skipped_count -> Int4,
+        details -> Nullable<Jsonb>,
+        error_message -> Nullable<Text>,
+        duration_ms -> Nullable<Int8>,
+        created_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
@@ -66,5 +84,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     stock_snapshots,
     daily_klines,
     profit_analysis,
+    job_execution_history,
 );
 

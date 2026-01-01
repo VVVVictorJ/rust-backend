@@ -233,6 +233,12 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
             if wb.unwrap_or(f64::MIN) < wb_min {
                 return None;
             }
+            
+            // 筛选 f137 > 0
+            let f137 = data.get("f137").and_then(|x| x.as_f64());
+            if f137.unwrap_or(0.0) <= 0.0 {
+                return None;
+            }
             let item = FilteredStockItem {
                 f57: data.get("f57").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
                 f58: data.get("f58").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
@@ -241,7 +247,7 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
                 f50: data.get("f50").and_then(|x| x.as_f64()),
                 f168: data.get("f168").and_then(|x| x.as_f64()),
                 f191: wb,
-                f137: data.get("f137").and_then(|x| x.as_f64()),
+                f137,
             };
             Some(item)
         });

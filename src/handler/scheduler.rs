@@ -1,11 +1,15 @@
 use axum::{
-    extract::State,
+    extract::{Path, Query, State},
     Json,
 };
 use serde::Serialize;
 
+use crate::api_models::scheduler::{
+    HistoryQueryParams, JobExecutionHistoryItem, JobExecutionHistoryResponse, JobInfo,
+};
 use crate::app::AppState;
 use crate::handler::error::AppError;
+use crate::repositories::job_execution_history;
 use crate::scheduler::{kline_import_job, profit_analysis_job};
 
 #[derive(Serialize)]
@@ -123,3 +127,85 @@ pub async fn trigger_profit_analysis(
     }
 }
 
+/// 获取任务列表
+pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
+    let jobs = vec![
+        JobInfo {
+            name: "kline_import".to_string(),
+            display_name: "K线数据导入".to_string(),
+            description: "自动导入当天的K线数据到数据库".to_string(),
+            schedule: "每天 15:01".to_string(),
+            enabled: true,
+        },
+        JobInfo {
+            name: "profit_analysis".to_string(),
+            display_name: "盈利分析".to_string(),
+            description: "分析股票快照的盈利情况".to_string(),
+            schedule: "每天 15:40".to_string(),
+            enabled: true,
+        },
+    ];
+    
+    Ok(Json(jobs))
+}
+
+/// 获取执行历史
+pub async fn get_execution_history(
+    Query(params): Query<HistoryQueryParams>,
+    State(state): State<AppState>,
+) -> Result<Json<JobExecutionHistoryResponse>, AppError> {
+    let page = params.page.unwrap_or(1);
+    let page_size = params.page_size.unwrap_or(20);
+    
+    let mut conn = state.db_pool.get()
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    let (items, total) = job_execution_history::paginate(
+        &mut conn,
+        params.job_name,
+        params.status,
+        page,
+        page_size,
+    )
+    .map_err(|_| AppError::InternalServerError)?;
+    
+    let items: Vec<JobExecutionHistoryItem> = items
+        .into_iter()
+        .map(|h| h.into())
+        .collect();
+    
+    Ok(Json(JobExecutionHistoryResponse {
+        total,
+        page,
+        page_size,
+        items,
+    }))
+}
+
+/// 获取历史详情
+pub async fn get_execution_detail(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<JobExecutionHistoryItem>, AppError> {
+    let mut conn = state.db_pool.get()
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    let history = job_execution_history::find_by_id(&mut conn, id)
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    Ok(Json(history.into()))
+}
+
+/// 获取最新执行记录
+pub async fn get_latest_execution(
+    Path(job_name): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Json<Option<JobExecutionHistoryItem>>, AppError> {
+    let mut conn = state.db_pool.get()
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    let history = job_execution_history::find_latest_by_job_name(&mut conn, &job_name)
+        .map_err(|_| AppError::InternalServerError)?;
+    
+    Ok(Json(history.map(|h| h.into())))
+}
