@@ -41,31 +41,6 @@ pub async fn create_profit_analysis_job(
         .with_run_async(Box::new(move |_uuid, _l| {
             let pool = db_pool.clone();
             Box::pin(async move {
-                // #region agent log
-                {
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-                    let utc_now = chrono::Utc::now();
-                    let local_now = chrono::Local::now();
-                    let log_data = serde_json::json!({
-                        "location": "profit_analysis_job.rs:43",
-                        "message": "盈利分析任务开始执行",
-                        "data": {
-                            "utc_time": utc_now.to_rfc3339(),
-                            "local_time": local_now.to_rfc3339(),
-                            "timezone": "Asia/Shanghai (UTC+8)"
-                        },
-                        "timestamp": utc_now.timestamp_millis(),
-                        "sessionId": "debug-session",
-                        "runId": "post-fix",
-                        "hypothesisId": "A,B,C"
-                    });
-                    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open("e:\\code\\python\\stockProject\\.cursor\\debug.log") {
-                        let _ = writeln!(file, "{log_data}");
-                    }
-                }
-                // #endregion
-                
                 if let Err(e) = run_profit_analysis_task(pool).await {
                     tracing::error!("盈利分析任务失败: {}", e);
                 }
