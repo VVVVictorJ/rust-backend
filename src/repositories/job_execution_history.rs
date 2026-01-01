@@ -84,6 +84,7 @@ pub fn paginate(
 }
 
 /// 根据任务名查询所有执行记录
+#[allow(dead_code)]
 pub fn find_by_job_name(
     conn: &mut PgConnection,
     job_name_filter: &str,
@@ -102,6 +103,7 @@ pub fn find_by_job_name(
 }
 
 /// 删除指定ID的记录
+#[allow(dead_code)]
 pub fn delete(
     conn: &mut PgConnection,
     history_id: i32,

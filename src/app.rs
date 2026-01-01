@@ -8,12 +8,14 @@ use tracing::Level;
 
 use crate::routes;
 use crate::utils::middleware;
+use crate::utils::ws_broadcast::TaskStatusSender;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: DbPool,
+    pub ws_sender: TaskStatusSender,
 }
 
 #[allow(dead_code)]
@@ -23,7 +25,8 @@ pub fn build_app() -> Router {
     let db_pool = Pool::builder()
         .build(manager)
         .expect("Failed to create DB pool");
-    let state = AppState { db_pool };
+    let ws_sender = crate::utils::ws_broadcast::create_broadcast_channel();
+    let state = AppState { db_pool, ws_sender };
 
     routes::build_routes()
         .with_state(state)
@@ -37,8 +40,8 @@ pub fn build_app() -> Router {
         )
 }
 
-pub fn build_app_with_pool(db_pool: DbPool) -> Router {
-    let state = AppState { db_pool };
+pub fn build_app_with_pool(db_pool: DbPool, ws_sender: TaskStatusSender) -> Router {
+    let state = AppState { db_pool, ws_sender };
 
     routes::build_routes()
         .with_state(state)

@@ -27,6 +27,7 @@ pub struct StockImportDetail {
 pub async fn create_kline_import_job(
     scheduler: &JobScheduler,
     db_pool: DbPool,
+    ws_sender: crate::utils::ws_broadcast::TaskStatusSender,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // 创建每天15:01执行的任务（北京时间 UTC+8）
     // 使用 JobBuilder 设置上海时区（UTC+8）
@@ -36,9 +37,40 @@ pub async fn create_kline_import_job(
         .with_schedule("0 1 15 * * *")?
         .with_run_async(Box::new(move |_uuid, _l| {
             let pool = db_pool.clone();
+            let sender = ws_sender.clone();
             Box::pin(async move {
-                if let Err(e) = run_kline_import_task(pool).await {
-                    tracing::error!("K线导入任务失败: {}", e);
+                // 广播任务开始
+                crate::utils::ws_broadcast::broadcast_task_status(
+                    &sender,
+                    "kline_import".to_string(),
+                    "running".to_string(),
+                );
+                
+                match run_kline_import_task(pool).await {
+                    Ok(result) => {
+                        // 广播任务完成
+                        let status = if result.failed_count == 0 {
+                            "success"
+                        } else if result.success_count > 0 {
+                            "partial"
+                        } else {
+                            "failed"
+                        };
+                        crate::utils::ws_broadcast::broadcast_task_status(
+                            &sender,
+                            "kline_import".to_string(),
+                            status.to_string(),
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!("K线导入任务失败: {}", e);
+                        // 广播任务失败
+                        crate::utils::ws_broadcast::broadcast_task_status(
+                            &sender,
+                            "kline_import".to_string(),
+                            "failed".to_string(),
+                        );
+                    }
                 }
             })
         }))
@@ -237,7 +269,7 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
                 total_count: Some(stock_codes.len() as i32),
                 success_count: Some(success_count as i32),
                 failed_count: Some(failed_count as i32),
-                skipped_count: Some(skipped_count as i32),
+                skipped_count: Some(skipped_count),
                 details: details_json,
                 error_message: None,
                 duration_ms: Some(duration),

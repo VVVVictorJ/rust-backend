@@ -31,6 +31,7 @@ pub struct SnapshotAnalysisDetail {
 pub async fn create_profit_analysis_job(
     scheduler: &JobScheduler,
     db_pool: DbPool,
+    ws_sender: crate::utils::ws_broadcast::TaskStatusSender,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // 创建每天15:40执行的任务（北京时间 UTC+8）
     // 使用 JobBuilder 设置上海时区（UTC+8）
@@ -40,9 +41,38 @@ pub async fn create_profit_analysis_job(
         .with_schedule("0 40 15 * * *")?
         .with_run_async(Box::new(move |_uuid, _l| {
             let pool = db_pool.clone();
+            let sender = ws_sender.clone();
             Box::pin(async move {
-                if let Err(e) = run_profit_analysis_task(pool).await {
-                    tracing::error!("盈利分析任务失败: {}", e);
+                // 广播任务开始
+                crate::utils::ws_broadcast::broadcast_task_status(
+                    &sender,
+                    "profit_analysis".to_string(),
+                    "running".to_string(),
+                );
+                
+                match run_profit_analysis_task(pool).await {
+                    Ok(result) => {
+                        // 广播任务完成
+                        let status = if result.analyzed_count > 0 || result.skipped_count > 0 {
+                            "success"
+                        } else {
+                            "failed"
+                        };
+                        crate::utils::ws_broadcast::broadcast_task_status(
+                            &sender,
+                            "profit_analysis".to_string(),
+                            status.to_string(),
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!("盈利分析任务失败: {}", e);
+                        // 广播任务失败
+                        crate::utils::ws_broadcast::broadcast_task_status(
+                            &sender,
+                            "profit_analysis".to_string(),
+                            "failed".to_string(),
+                        );
+                    }
                 }
             })
         }))

@@ -29,11 +29,14 @@ async fn main() {
     // 启动定时调度器
     let scheduler = tokio_cron_scheduler::JobScheduler::new().await.expect("创建调度器失败");
     
-    if let Err(e) = scheduler::kline_import_job::create_kline_import_job(&scheduler, db_pool.clone()).await {
+    // 创建 WebSocket 广播通道
+    let ws_sender = utils::ws_broadcast::create_broadcast_channel();
+    
+    if let Err(e) = scheduler::kline_import_job::create_kline_import_job(&scheduler, db_pool.clone(), ws_sender.clone()).await {
         tracing::error!("创建K线导入任务失败: {}", e);
     }
     
-    if let Err(e) = scheduler::profit_analysis_job::create_profit_analysis_job(&scheduler, db_pool.clone()).await {
+    if let Err(e) = scheduler::profit_analysis_job::create_profit_analysis_job(&scheduler, db_pool.clone(), ws_sender.clone()).await {
         tracing::error!("创建盈利分析任务失败: {}", e);
     }
     
@@ -41,7 +44,7 @@ async fn main() {
     tracing::info!("定时任务调度器已启动");
     
     // 构建并启动 Web 服务
-    let app = app::build_app_with_pool(db_pool);
+    let app = app::build_app_with_pool(db_pool, ws_sender);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

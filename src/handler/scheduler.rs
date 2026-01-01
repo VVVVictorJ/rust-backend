@@ -57,9 +57,30 @@ pub async fn trigger_kline_import(
 ) -> Result<Json<TriggerTaskResponse>, AppError> {
     tracing::info!("收到手动触发K线导入任务的请求");
     
+    // 广播任务开始
+    crate::utils::ws_broadcast::broadcast_task_status(
+        &state.ws_sender,
+        "kline_import".to_string(),
+        "running".to_string(),
+    );
+    
     // 调用定时任务的核心逻辑
     match kline_import_job::run_kline_import_task(state.db_pool.clone()).await {
         Ok(result) => {
+            // 广播任务完成
+            let status = if result.failed_count == 0 {
+                "success"
+            } else if result.success_count > 0 {
+                "partial"
+            } else {
+                "failed"
+            };
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "kline_import".to_string(),
+                status.to_string(),
+            );
+            
             let details = result.stock_details.into_iter()
                 .map(|d| StockDetail {
                     stock_code: d.stock_code,
@@ -83,6 +104,12 @@ pub async fn trigger_kline_import(
         }
         Err(e) => {
             tracing::error!("手动触发K线导入任务失败: {}", e);
+            // 广播任务失败
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "kline_import".to_string(),
+                "failed".to_string(),
+            );
             Err(AppError::InternalServerError)
         }
     }
@@ -94,9 +121,28 @@ pub async fn trigger_profit_analysis(
 ) -> Result<Json<TriggerProfitAnalysisResponse>, AppError> {
     tracing::info!("收到手动触发盈利分析任务的请求");
     
+    // 广播任务开始
+    crate::utils::ws_broadcast::broadcast_task_status(
+        &state.ws_sender,
+        "profit_analysis".to_string(),
+        "running".to_string(),
+    );
+    
     // 调用定时任务的核心逻辑
     match profit_analysis_job::run_profit_analysis_task(state.db_pool.clone()).await {
         Ok(result) => {
+            // 广播任务完成
+            let status = if result.analyzed_count > 0 || result.skipped_count > 0 || result.total_snapshots == 0 {
+                "success"
+            } else {
+                "failed"
+            };
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "profit_analysis".to_string(),
+                status.to_string(),
+            );
+            
             let details = result.snapshot_details.into_iter()
                 .map(|d| SnapshotDetail {
                     stock_code: d.stock_code,
@@ -122,6 +168,12 @@ pub async fn trigger_profit_analysis(
         }
         Err(e) => {
             tracing::error!("手动触发盈利分析任务失败: {}", e);
+            // 广播任务失败
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "profit_analysis".to_string(),
+                "failed".to_string(),
+            );
             Err(AppError::InternalServerError)
         }
     }

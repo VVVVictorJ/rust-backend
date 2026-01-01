@@ -9,3 +9,4 @@ pub mod daily_kline;
 pub mod scheduler;
 pub mod stock_trade_date_query;
 pub mod stock_price_compare;
+pub mod ws_handler;

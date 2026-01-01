@@ -5,6 +5,7 @@ use crate::handler::scheduler::{
     get_execution_detail, get_execution_history, get_job_list, get_latest_execution,
     trigger_kline_import, trigger_profit_analysis,
 };
+use crate::handler::ws_handler;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -16,5 +17,7 @@ pub fn router() -> Router<AppState> {
         .route("/history", get(get_execution_history))
         .route("/history/:id", get(get_execution_detail))
         .route("/latest/:job_name", get(get_latest_execution))
+        // WebSocket 路由
+        .route("/ws", get(ws_handler::ws_handler))
 }
 

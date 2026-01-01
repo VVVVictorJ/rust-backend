@@ -10,4 +10,4 @@ pub use stock_request_stocks::{StockRequestStock, NewStockRequestStock};
 pub use stock_snapshots::{StockSnapshot, NewStockSnapshot};
 pub use daily_klines::{DailyKline, NewDailyKline};
 pub use profit_analysis::{ProfitAnalysis, NewProfitAnalysis};
-pub use job_execution_history::{JobExecutionHistory, NewJobExecutionHistory, UpdateJobExecutionHistory};
+pub use job_execution_history::{NewJobExecutionHistory, UpdateJobExecutionHistory};
