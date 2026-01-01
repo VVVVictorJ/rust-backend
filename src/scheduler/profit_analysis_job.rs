@@ -18,7 +18,7 @@ pub struct ProfitAnalysisResult {
     pub snapshot_details: Vec<SnapshotAnalysisDetail>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct SnapshotAnalysisDetail {
     pub stock_code: String,
     pub stock_name: String,
@@ -82,6 +82,37 @@ pub async fn create_profit_analysis_job(
 pub async fn run_profit_analysis_task(db_pool: DbPool) -> anyhow::Result<ProfitAnalysisResult> {
     tracing::info!("开始执行盈利分析任务");
     
+    let start_time = chrono::Local::now().naive_local();
+    let mut history_id: Option<i32> = None;
+    
+    // 记录任务开始
+    {
+        let mut conn = db_pool.get()?;
+        let new_history = crate::models::NewJobExecutionHistory {
+            job_name: "profit_analysis".to_string(),
+            status: "running".to_string(),
+            started_at: start_time,
+            completed_at: None,
+            total_count: 0,
+            success_count: 0,
+            failed_count: 0,
+            skipped_count: 0,
+            details: None,
+            error_message: None,
+            duration_ms: None,
+        };
+        
+        match crate::repositories::job_execution_history::create(&mut conn, &new_history) {
+            Ok(history) => {
+                history_id = Some(history.id);
+                tracing::info!("创建任务执行记录，ID: {}", history.id);
+            }
+            Err(e) => {
+                tracing::warn!("创建任务执行记录失败: {}", e);
+            }
+        }
+    }
+    
     // 1. 获取数据库连接
     let mut conn = db_pool.get()?;
     
@@ -91,6 +122,28 @@ pub async fn run_profit_analysis_task(db_pool: DbPool) -> anyhow::Result<ProfitA
     
     if pending_requests.is_empty() {
         tracing::info!("没有待处理的请求，跳过盈利分析");
+        
+        // 更新任务完成状态
+        if let Some(id) = history_id {
+            let end_time = chrono::Local::now().naive_local();
+            let duration = (end_time - start_time).num_milliseconds();
+            let mut conn = db_pool.get().ok();
+            if let Some(ref mut c) = conn {
+                let update = crate::models::UpdateJobExecutionHistory {
+                    status: Some("success".to_string()),
+                    completed_at: Some(end_time),
+                    total_count: Some(0),
+                    success_count: Some(0),
+                    failed_count: Some(0),
+                    skipped_count: Some(0),
+                    details: None,
+                    error_message: Some("没有待处理的请求".to_string()),
+                    duration_ms: Some(duration),
+                };
+                let _ = crate::repositories::job_execution_history::update(c, id, &update);
+            }
+        }
+        
         return Ok(ProfitAnalysisResult {
             total_snapshots: 0,
             analyzed_count: 0,
@@ -183,6 +236,39 @@ pub async fn run_profit_analysis_task(db_pool: DbPool) -> anyhow::Result<ProfitA
         skipped_count,
         no_kline_count
     );
+    
+    // 更新任务完成状态
+    if let Some(id) = history_id {
+        let end_time = chrono::Local::now().naive_local();
+        let duration = (end_time - start_time).num_milliseconds();
+        let mut conn = db_pool.get().ok();
+        if let Some(ref mut c) = conn {
+            let status = if analyzed_count > 0 || skipped_count > 0 {
+                "success"
+            } else {
+                "failed"
+            };
+            
+            let details_json = serde_json::to_value(&snapshot_details).ok();
+            
+            let update = crate::models::UpdateJobExecutionHistory {
+                status: Some(status.to_string()),
+                completed_at: Some(end_time),
+                total_count: Some(total_snapshots as i32),
+                success_count: Some(analyzed_count as i32),
+                failed_count: Some(0),
+                skipped_count: Some(skipped_count as i32),
+                details: details_json,
+                error_message: None,
+                duration_ms: Some(duration),
+            };
+            
+            match crate::repositories::job_execution_history::update(c, id, &update) {
+                Ok(_) => tracing::info!("任务执行记录已更新"),
+                Err(e) => tracing::warn!("更新任务执行记录失败: {}", e),
+            }
+        }
+    }
     
     Ok(ProfitAnalysisResult {
         total_snapshots,

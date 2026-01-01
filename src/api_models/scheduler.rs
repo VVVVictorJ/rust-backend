@@ -6,6 +6,7 @@ use crate::models::job_execution_history::JobExecutionHistory;
 
 /// 任务信息
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct JobInfo {
     pub name: String,
     pub display_name: String,
@@ -25,6 +26,7 @@ pub struct HistoryQueryParams {
 
 /// 执行历史响应
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct JobExecutionHistoryResponse {
     pub total: i64,
     pub page: i64,
@@ -34,6 +36,7 @@ pub struct JobExecutionHistoryResponse {
 
 /// 执行历史条目
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct JobExecutionHistoryItem {
     pub id: i32,
     pub job_name: String,

@@ -55,22 +55,26 @@ pub fn paginate(
 ) -> Result<(Vec<JobExecutionHistory>, i64), DieselError> {
     let offset = (page - 1) * page_size;
     
-    let mut query = job_execution_history.into_boxed();
+    // 构建基础查询（需要两个独立的查询对象）
+    let mut count_query = job_execution_history.into_boxed();
+    let mut items_query = job_execution_history.into_boxed();
     
-    // 应用筛选条件
-    if let Some(job_name_val) = job_name_filter {
-        query = query.filter(job_name.eq(job_name_val));
+    // 应用筛选条件到两个查询
+    if let Some(ref job_name_val) = job_name_filter {
+        count_query = count_query.filter(job_name.eq(job_name_val));
+        items_query = items_query.filter(job_name.eq(job_name_val));
     }
     
-    if let Some(status_val) = status_filter {
-        query = query.filter(status.eq(status_val));
+    if let Some(ref status_val) = status_filter {
+        count_query = count_query.filter(status.eq(status_val));
+        items_query = items_query.filter(status.eq(status_val));
     }
     
     // 获取总数
-    let total = query.count().get_result(conn)?;
+    let total = count_query.count().get_result(conn)?;
     
     // 获取分页数据
-    let items = query
+    let items = items_query
         .order(started_at.desc())
         .limit(page_size)
         .offset(offset)

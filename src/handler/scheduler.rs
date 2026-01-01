@@ -157,13 +157,17 @@ pub async fn get_execution_history(
     let page = params.page.unwrap_or(1);
     let page_size = params.page_size.unwrap_or(20);
     
+    // 将空字符串转换为 None
+    let job_name_filter = params.job_name.filter(|s| !s.is_empty());
+    let status_filter = params.status.filter(|s| !s.is_empty());
+    
     let mut conn = state.db_pool.get()
         .map_err(|_| AppError::InternalServerError)?;
     
     let (items, total) = job_execution_history::paginate(
         &mut conn,
-        params.job_name,
-        params.status,
+        job_name_filter,
+        status_filter,
         page,
         page_size,
     )

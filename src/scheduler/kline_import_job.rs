@@ -16,7 +16,7 @@ pub struct KlineImportResult {
     pub stock_details: Vec<StockImportDetail>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct StockImportDetail {
     pub stock_code: String,
     pub imported_count: usize,
@@ -78,6 +78,37 @@ pub async fn create_kline_import_job(
 pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImportResult> {
     tracing::info!("开始执行K线导入定时任务");
     
+    let start_time = chrono::Local::now().naive_local();
+    let mut history_id: Option<i32> = None;
+    
+    // 记录任务开始
+    {
+        let mut conn = db_pool.get()?;
+        let new_history = crate::models::NewJobExecutionHistory {
+            job_name: "kline_import".to_string(),
+            status: "running".to_string(),
+            started_at: start_time,
+            completed_at: None,
+            total_count: 0,
+            success_count: 0,
+            failed_count: 0,
+            skipped_count: 0,
+            details: None,
+            error_message: None,
+            duration_ms: None,
+        };
+        
+        match crate::repositories::job_execution_history::create(&mut conn, &new_history) {
+            Ok(history) => {
+                history_id = Some(history.id);
+                tracing::info!("创建任务执行记录，ID: {}", history.id);
+            }
+            Err(e) => {
+                tracing::warn!("创建任务执行记录失败: {}", e);
+            }
+        }
+    }
+    
     // 1. 获取数据库连接
     let mut conn = db_pool.get()?;
     
@@ -87,6 +118,28 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     
     if stock_codes.is_empty() {
         tracing::info!("今日没有股票代码入库，跳过K线导入");
+        
+        // 更新任务完成状态
+        if let Some(id) = history_id {
+            let end_time = chrono::Local::now().naive_local();
+            let duration = (end_time - start_time).num_milliseconds();
+            let mut conn = db_pool.get().ok();
+            if let Some(ref mut c) = conn {
+                let update = crate::models::UpdateJobExecutionHistory {
+                    status: Some("success".to_string()),
+                    completed_at: Some(end_time),
+                    total_count: Some(0),
+                    success_count: Some(0),
+                    failed_count: Some(0),
+                    skipped_count: Some(0),
+                    details: None,
+                    error_message: Some("今日没有股票代码入库".to_string()),
+                    duration_ms: Some(duration),
+                };
+                let _ = crate::repositories::job_execution_history::update(c, id, &update);
+            }
+        }
+        
         return Ok(KlineImportResult {
             total_stocks: 0,
             success_count: 0,
@@ -186,6 +239,41 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
         failed_count,
         skipped_count
     );
+    
+    // 更新任务完成状态
+    if let Some(id) = history_id {
+        let end_time = chrono::Local::now().naive_local();
+        let duration = (end_time - start_time).num_milliseconds();
+        let mut conn = db_pool.get().ok();
+        if let Some(ref mut c) = conn {
+            let status = if failed_count == 0 {
+                "success"
+            } else if success_count > 0 {
+                "partial"
+            } else {
+                "failed"
+            };
+            
+            let details_json = serde_json::to_value(&stock_details).ok();
+            
+            let update = crate::models::UpdateJobExecutionHistory {
+                status: Some(status.to_string()),
+                completed_at: Some(end_time),
+                total_count: Some(stock_codes.len() as i32),
+                success_count: Some(success_count as i32),
+                failed_count: Some(failed_count as i32),
+                skipped_count: Some(skipped_count as i32),
+                details: details_json,
+                error_message: None,
+                duration_ms: Some(duration),
+            };
+            
+            match crate::repositories::job_execution_history::update(c, id, &update) {
+                Ok(_) => tracing::info!("任务执行记录已更新"),
+                Err(e) => tracing::warn!("更新任务执行记录失败: {}", e),
+            }
+        }
+    }
     
     Ok(KlineImportResult {
         total_stocks: stock_codes.len(),
