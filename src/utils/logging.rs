@@ -1,5 +1,18 @@
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt, fmt};
+use tracing_subscriber::fmt::time::FormatTime;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use chrono::Utc;
+use chrono_tz::Asia::Shanghai;
+
+/// 自定义时间格式化器，使用 UTC+8 (上海时区)
+struct ShanghaiTime;
+
+impl FormatTime for ShanghaiTime {
+    fn format_time(&self, w: &mut tracing_subscriber::fmt::format::Writer<'_>) -> std::fmt::Result {
+        let now = Utc::now().with_timezone(&Shanghai);
+        write!(w, "{}", now.format("%Y-%m-%d %H:%M:%S%.3f"))
+    }
+}
 
 pub fn init_logging() {
     let env_filter = EnvFilter::try_from_default_env()
@@ -7,6 +20,7 @@ pub fn init_logging() {
 
     // 控制台输出层（始终启用）
     let console_layer = fmt::layer()
+        .with_timer(ShanghaiTime)
         .with_target(true)
         .with_thread_ids(true)
         .with_line_number(true);
@@ -27,6 +41,7 @@ pub fn init_logging() {
         );
         
         let file_layer = fmt::layer()
+            .with_timer(ShanghaiTime)
             .with_writer(file_appender)
             .with_ansi(false)  // 文件不需要 ANSI 颜色
             .with_target(true)
