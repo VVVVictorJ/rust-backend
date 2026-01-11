@@ -10,7 +10,7 @@ use crate::api_models::scheduler::{
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::repositories::job_execution_history;
-use crate::scheduler::{kline_import_job, profit_analysis_job};
+use crate::scheduler::{kline_import_job, profit_analysis_job, stock_filter_job};
 
 #[derive(Serialize)]
 pub struct TriggerTaskResponse {
@@ -179,6 +179,60 @@ pub async fn trigger_profit_analysis(
     }
 }
 
+/// 股票筛选任务响应
+#[derive(Serialize)]
+pub struct TriggerStockFilterResponse {
+    pub success: bool,
+    pub message: String,
+    pub items_count: usize,
+}
+
+/// 手动触发股票筛选任务
+pub async fn trigger_stock_filter(
+    State(state): State<AppState>,
+) -> Result<Json<TriggerStockFilterResponse>, AppError> {
+    tracing::info!("收到手动触发股票筛选任务的请求");
+    
+    // 广播任务开始
+    crate::utils::ws_broadcast::broadcast_task_status(
+        &state.ws_sender,
+        "stock_filter".to_string(),
+        "running".to_string(),
+    );
+    
+    // 调用定时任务的核心逻辑
+    match stock_filter_job::run_stock_filter_task(state.db_pool.clone(), "manual").await {
+        Ok(result) => {
+            // 广播任务完成
+            let status = if result.success { "success" } else { "failed" };
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "stock_filter".to_string(),
+                status.to_string(),
+            );
+            
+            Ok(Json(TriggerStockFilterResponse {
+                success: result.success,
+                message: format!(
+                    "股票筛选任务执行完成，筛选到 {} 只符合条件的股票",
+                    result.items_count
+                ),
+                items_count: result.items_count,
+            }))
+        }
+        Err(e) => {
+            tracing::error!("手动触发股票筛选任务失败: {}", e);
+            // 广播任务失败
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "stock_filter".to_string(),
+                "failed".to_string(),
+            );
+            Err(AppError::InternalServerError)
+        }
+    }
+}
+
 /// 获取任务列表
 pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
     let jobs = vec![
@@ -194,6 +248,20 @@ pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
             display_name: "盈利分析".to_string(),
             description: "分析股票快照的盈利情况".to_string(),
             schedule: "每天 15:40".to_string(),
+            enabled: true,
+        },
+        JobInfo {
+            name: "stock_filter_morning".to_string(),
+            display_name: "股票筛选(上午)".to_string(),
+            description: "交易时段自动筛选符合条件的股票并入库".to_string(),
+            schedule: "工作日 9:30-12:00 每分钟".to_string(),
+            enabled: true,
+        },
+        JobInfo {
+            name: "stock_filter_afternoon".to_string(),
+            display_name: "股票筛选(下午)".to_string(),
+            description: "交易时段自动筛选符合条件的股票并入库".to_string(),
+            schedule: "工作日 13:00-15:00 每分钟".to_string(),
             enabled: true,
         },
     ];

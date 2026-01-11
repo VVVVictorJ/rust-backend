@@ -16,6 +16,7 @@ pub struct JobInfo {
 
 /// 查询参数
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct HistoryQueryParams {
     pub job_name: Option<String>,
     pub status: Option<String>,
