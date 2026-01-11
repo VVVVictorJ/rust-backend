@@ -13,7 +13,6 @@ use serde_json::Value;
 pub struct StockFilterResult {
     pub items_count: usize,
     pub success: bool,
-    pub error: Option<String>,
 }
 
 /// 创建股票筛选定时任务（上午和下午两个时段）
@@ -128,7 +127,7 @@ pub async fn run_stock_filter_task(db_pool: DbPool, session: &str) -> anyhow::Re
     {
         let mut conn = db_pool.get()?;
         let new_history = NewJobExecutionHistory {
-            job_name: format!("stock_filter_{}", session),
+            job_name: format!("stock_filter_{session}"),
             status: "running".to_string(),
             started_at: start_time,
             completed_at: None,
@@ -170,7 +169,7 @@ pub async fn run_stock_filter_task(db_pool: DbPool, session: &str) -> anyhow::Re
                     // 持久化到数据库
                     if let Err(e) = persist_to_db(&db_pool, items_arr).await {
                         tracing::warn!("持久化股票数据失败: {}", e);
-                        (items_arr.len(), true, Some(format!("数据获取成功但持久化失败: {}", e)))
+                        (items_arr.len(), true, Some(format!("数据获取成功但持久化失败: {e}")))
                     } else {
                         tracing::info!("成功筛选并持久化 {} 条股票数据", items_arr.len());
                         (items_arr.len(), true, None)
@@ -220,7 +219,6 @@ pub async fn run_stock_filter_task(db_pool: DbPool, session: &str) -> anyhow::Re
     Ok(StockFilterResult {
         items_count,
         success,
-        error: error_msg,
     })
 }
 
