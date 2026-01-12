@@ -128,6 +128,11 @@ jobs:
             if [ ! -f ".env" ]; then
               printf 'ALLOWED_ORIGINS=\nHOST=0.0.0.0\nPORT=8000\n' > .env
             fi
+            # 确保 PostgreSQL 运行并执行数据库迁移
+            docker compose up -d postgres
+            sleep 5
+            docker exec stock-postgres psql -U stock_user -d stock_db -f /docker-entrypoint-initdb.d/01-init.sql || true
+            # 拉取并启动后端
             docker compose pull backend
             docker compose up -d backend
             docker image prune -f
