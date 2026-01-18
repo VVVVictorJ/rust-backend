@@ -36,6 +36,9 @@ comment on column stock_plate_stock_table.stock_table_id is '股票表ID';
 
 -- 索引建议（按需启用）
 create unique index if not exists idx_stock_plate_name on stock_plate(name);
+create unique index if not exists idx_stock_plate_code on stock_plate(plate_code);
 create unique index if not exists idx_stock_table_code on stock_table(stock_code);
+create index if not exists idx_stock_table_name on stock_table(stock_name);
 create index if not exists idx_stock_plate_stock_table_plate_id on stock_plate_stock_table(plate_id);
 create index if not exists idx_stock_plate_stock_table_stock_table_id on stock_plate_stock_table(stock_table_id);
+create unique index if not exists idx_stock_plate_stock_table_unique on stock_plate_stock_table(plate_id, stock_table_id);
