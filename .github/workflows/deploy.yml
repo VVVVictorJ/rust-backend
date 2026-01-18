@@ -132,6 +132,12 @@ jobs:
             docker compose up -d postgres
             sleep 5
             docker exec stock-postgres psql -U stock_user -d stock_analysis -f /docker-entrypoint-initdb.d/01-init.sql || true
+            # 输出表/索引检查结果
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\dt"
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate"
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
+
             # 拉取并启动后端
             docker compose pull backend
             docker compose up -d backend
