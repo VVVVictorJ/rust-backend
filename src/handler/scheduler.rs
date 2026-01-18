@@ -10,7 +10,9 @@ use crate::api_models::scheduler::{
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::repositories::job_execution_history;
-use crate::scheduler::{kline_import_job, profit_analysis_job, stock_filter_job, stock_table_sync_job};
+use crate::scheduler::{
+    kline_import_job, profit_analysis_job, stock_filter_job, stock_plate_sync_job, stock_table_sync_job,
+};
 
 #[derive(Serialize)]
 pub struct TriggerTaskResponse {
@@ -206,6 +208,27 @@ pub struct StockTableSyncDetail {
     pub error: Option<String>,
 }
 
+#[derive(Serialize)]
+pub struct TriggerStockPlateSyncResponse {
+    pub success: bool,
+    pub message: String,
+    pub total_count: usize,
+    pub success_count: usize,
+    pub failed_count: usize,
+    pub skipped_count: usize,
+    pub details: Vec<StockPlateSyncDetail>,
+}
+
+#[derive(Serialize)]
+pub struct StockPlateSyncDetail {
+    pub stock_code: String,
+    pub plate_total: usize,
+    pub plate_inserted: usize,
+    pub relation_inserted: usize,
+    pub action: String,
+    pub error: Option<String>,
+}
+
 /// 手动触发股票筛选任务
 pub async fn trigger_stock_filter(
     State(state): State<AppState>,
@@ -315,6 +338,71 @@ pub async fn trigger_stock_table_sync(
     }
 }
 
+/// 手动触发 stock_plate 同步任务
+pub async fn trigger_stock_plate_sync(
+    State(state): State<AppState>,
+) -> Result<Json<TriggerStockPlateSyncResponse>, AppError> {
+    tracing::info!("收到手动触发 stock_plate 同步任务的请求");
+
+    crate::utils::ws_broadcast::broadcast_task_status(
+        &state.ws_sender,
+        "stock_plate_sync".to_string(),
+        "running".to_string(),
+    );
+
+    match stock_plate_sync_job::run_stock_plate_sync_task(state.db_pool.clone()).await {
+        Ok(result) => {
+            let status = if result.failed_count == 0 {
+                "success"
+            } else if result.success_count > 0 {
+                "partial"
+            } else {
+                "failed"
+            };
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "stock_plate_sync".to_string(),
+                status.to_string(),
+            );
+
+            let details = result
+                .details
+                .into_iter()
+                .map(|d| StockPlateSyncDetail {
+                    stock_code: d.stock_code,
+                    plate_total: d.plate_total,
+                    plate_inserted: d.plate_inserted,
+                    relation_inserted: d.relation_inserted,
+                    action: d.action,
+                    error: d.error,
+                })
+                .collect();
+
+            Ok(Json(TriggerStockPlateSyncResponse {
+                success: result.failed_count == 0,
+                message: format!(
+                    "stock_plate 同步任务执行完成，总计 {} 条，成功 {} 条，失败 {} 条，跳过 {} 条",
+                    result.total_count, result.success_count, result.failed_count, result.skipped_count
+                ),
+                total_count: result.total_count,
+                success_count: result.success_count,
+                failed_count: result.failed_count,
+                skipped_count: result.skipped_count,
+                details,
+            }))
+        }
+        Err(e) => {
+            tracing::error!("手动触发 stock_plate 同步任务失败: {}", e);
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "stock_plate_sync".to_string(),
+                "failed".to_string(),
+            );
+            Err(AppError::InternalServerError)
+        }
+    }
+}
+
 /// 获取任务列表
 pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
     let jobs = vec![
@@ -330,6 +418,13 @@ pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
             display_name: "stock_table 同步".to_string(),
             description: "从快照去重写入 stock_table".to_string(),
             schedule: "每天 04:00".to_string(),
+            enabled: true,
+        },
+        JobInfo {
+            name: "stock_plate_sync".to_string(),
+            display_name: "stock_plate 同步".to_string(),
+            description: "根据 stock_table 同步板块及关系".to_string(),
+            schedule: "每天 04:30".to_string(),
             enabled: true,
         },
         JobInfo {

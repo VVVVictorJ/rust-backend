@@ -2,6 +2,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sql_types::{BigInt, Int4, Text};
+use diesel::OptionalExtension;
 
 use crate::models::NewStockPlateStockTable;
 use crate::schema::stock_plate_stock_table::dsl::{
@@ -31,6 +32,20 @@ pub fn delete_by_pk(
             .filter(stock_table_id_col.eq(stock_table_id_val)),
     )
     .execute(conn)
+}
+
+pub fn exists_by_ids(
+    conn: &mut PgPoolConn,
+    plate_id_val: i32,
+    stock_table_id_val: i32,
+) -> Result<bool, diesel::result::Error> {
+    let existing = stock_plate_stock_table
+        .filter(plate_id_col.eq(plate_id_val))
+        .filter(stock_table_id_col.eq(stock_table_id_val))
+        .select(plate_id_col)
+        .first::<i32>(conn)
+        .optional()?;
+    Ok(existing.is_some())
 }
 
 #[derive(Debug, QueryableByName)]
