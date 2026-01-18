@@ -18,6 +18,35 @@ diesel::table! {
 }
 
 diesel::table! {
+    stock_plate (id) {
+        id -> Int4,
+        plate_code -> Varchar,
+        name -> Varchar,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    stock_table (id) {
+        id -> Int4,
+        stock_code -> Varchar,
+        stock_name -> Varchar,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    stock_plate_stock_table (plate_id, stock_table_id) {
+        plate_id -> Int4,
+        stock_table_id -> Int4,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
+diesel::table! {
     stock_snapshots (id) {
         id -> Int4,
         request_id -> Int4,
@@ -77,10 +106,15 @@ diesel::table! {
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
+diesel::joinable!(stock_plate_stock_table -> stock_plate (plate_id));
+diesel::joinable!(stock_plate_stock_table -> stock_table (stock_table_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     stock_requests,
     stock_request_stocks,
+    stock_plate,
+    stock_table,
+    stock_plate_stock_table,
     stock_snapshots,
     daily_klines,
     profit_analysis,

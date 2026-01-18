@@ -8,6 +8,9 @@ pub mod kline_import;
 pub mod stock_trade_date_query;
 pub mod stock_price_compare;
 pub mod scheduler;
+pub mod stock_plate;
+pub mod stock_table;
+pub mod stock_plate_stock_table;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -27,4 +30,12 @@ pub use stock_trade_date_query::{TradeDateQueryRequest, TradeDateQueryItem, Trad
 pub use stock_price_compare::{PriceCompareRequest, PriceCompareItem, PriceCompareResponse};
 #[allow(unused_imports)]
 pub use scheduler::{JobInfo, HistoryQueryParams, JobExecutionHistoryResponse, JobExecutionHistoryItem};
+#[allow(unused_imports)]
+pub use stock_plate::{CreateStockPlate, UpdateStockPlateRequest, StockPlateResponse};
+#[allow(unused_imports)]
+pub use stock_table::{CreateStockTable, UpdateStockTableRequest, StockTableResponse};
+#[allow(unused_imports)]
+pub use stock_plate_stock_table::{
+    CreateStockPlateStockTable, StockPlateStockItem, StockPlateStockQuery, StockPlateStockQueryResponse,
+};
 
