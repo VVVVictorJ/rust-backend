@@ -937,6 +937,39 @@ profit_low = 入场价 × 1.05 (原价+5%)
 
 ---
 
+### 8.3 stock_table 同步任务（每天 UTC+8 04:00）
+
+**功能**: 从 `stock_snapshots` 去重 `stock_code`，将 `stock_code/stock_name` 写入 `stock_table`（已存在则跳过）
+
+**执行时间**: 每天北京时间 04:00
+
+**验证方式**:
+
+```sql
+-- 查看 stock_table 是否有新增记录
+select stock_code, stock_name, created_at
+from stock_table
+order by created_at desc
+limit 20;
+```
+
+```sql
+-- 查看任务执行记录
+select job_name, status, total_count, success_count, failed_count, skipped_count, started_at, completed_at
+from job_execution_history
+where job_name = 'stock_table_sync'
+order by started_at desc
+limit 5;
+```
+
+**手动触发**:
+
+```bash
+curl -i -X POST http://localhost:8001/api/scheduler/trigger-stock-table-sync
+```
+
+---
+
 ## 附录：错误码说明
 
 | 状态码                        | 说明                                        |

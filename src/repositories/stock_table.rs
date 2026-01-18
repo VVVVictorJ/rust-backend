@@ -1,6 +1,7 @@
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
+use diesel::OptionalExtension;
 
 use crate::models::{NewStockTable, StockTable, UpdateStockTable};
 use crate::schema::stock_table::dsl::*;
@@ -33,4 +34,13 @@ pub fn update_by_id(
 
 pub fn delete_by_id(conn: &mut PgPoolConn, stock_id: i32) -> Result<usize, diesel::result::Error> {
     diesel::delete(stock_table.find(stock_id)).execute(conn)
+}
+
+pub fn exists_by_code(conn: &mut PgPoolConn, code: &str) -> Result<bool, diesel::result::Error> {
+    let existing = stock_table
+        .filter(stock_code.eq(code))
+        .select(id)
+        .first::<i32>(conn)
+        .optional()?;
+    Ok(existing.is_some())
 }

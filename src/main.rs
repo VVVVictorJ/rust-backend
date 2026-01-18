@@ -43,6 +43,10 @@ async fn main() {
     if let Err(e) = scheduler::stock_filter_job::create_stock_filter_jobs(&scheduler, db_pool.clone(), ws_sender.clone()).await {
         tracing::error!("创建股票筛选定时任务失败: {}", e);
     }
+
+    if let Err(e) = scheduler::stock_table_sync_job::create_stock_table_sync_job(&scheduler, db_pool.clone(), ws_sender.clone()).await {
+        tracing::error!("创建 stock_table 同步定时任务失败: {}", e);
+    }
     
     scheduler.start().await.expect("启动调度器失败");
     tracing::info!("定时任务调度器已启动");

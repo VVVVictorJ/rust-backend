@@ -3,7 +3,7 @@ use axum::{routing::{get, post}, Router};
 use crate::app::AppState;
 use crate::handler::scheduler::{
     get_execution_detail, get_execution_history, get_job_list, get_latest_execution,
-    trigger_kline_import, trigger_profit_analysis, trigger_stock_filter,
+    trigger_kline_import, trigger_profit_analysis, trigger_stock_filter, trigger_stock_table_sync,
 };
 use crate::handler::ws_handler;
 
@@ -13,6 +13,7 @@ pub fn router() -> Router<AppState> {
         .route("/trigger-kline-import", post(trigger_kline_import))
         .route("/trigger-profit-analysis", post(trigger_profit_analysis))
         .route("/trigger-stock-filter", post(trigger_stock_filter))
+        .route("/trigger-stock-table-sync", post(trigger_stock_table_sync))
         // 查询接口
         .route("/jobs", get(get_job_list))
         .route("/history", get(get_execution_history))

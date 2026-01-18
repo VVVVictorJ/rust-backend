@@ -11,6 +11,7 @@ pub mod scheduler;
 pub mod stock_plate;
 pub mod stock_table;
 pub mod stock_plate_stock_table;
+pub mod stock_plate_em;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -38,4 +39,6 @@ pub use stock_table::{CreateStockTable, UpdateStockTableRequest, StockTableRespo
 pub use stock_plate_stock_table::{
     CreateStockPlateStockTable, StockPlateStockItem, StockPlateStockQuery, StockPlateStockQueryResponse,
 };
+#[allow(unused_imports)]
+pub use stock_plate_em::{EmPlateItem, EmPlateResponse};
 

@@ -1,10 +1,13 @@
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
+use diesel::sql_types::Text;
 use chrono::{DateTime, FixedOffset, Utc};
 
 use crate::models::{NewStockSnapshot, StockSnapshot};
-use crate::schema::stock_snapshots::dsl::*;
+use crate::schema::stock_snapshots::dsl::{
+    created_at, id, request_id, stock_code as stock_code_col, stock_snapshots,
+};
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
@@ -83,10 +86,31 @@ pub fn get_distinct_codes_today(conn: &mut PgPoolConn) -> Result<Vec<String>, di
     );
     
     stock_snapshots
-        .select(stock_code)
+        .select(stock_code_col)
         .filter(created_at.ge(today_start_utc))
         .filter(created_at.lt(tomorrow_start_utc))
         .distinct()
         .load::<String>(conn)
+}
+
+#[derive(Debug, QueryableByName)]
+pub struct StockCodeName {
+    #[diesel(sql_type = Text, column_name = "stock_code")]
+    pub code: String,
+    #[diesel(sql_type = Text, column_name = "stock_name")]
+    pub name: String,
+}
+
+/// 获取去重后的 stock_code + stock_name（按 created_at 倒序取最新）
+pub fn list_distinct_codes_with_name(conn: &mut PgPoolConn) -> Result<Vec<StockCodeName>, diesel::result::Error> {
+    let query = r#"
+        SELECT DISTINCT ON (stock_code)
+            stock_code,
+            stock_name
+        FROM stock_snapshots
+        ORDER BY stock_code, created_at DESC
+    "#;
+
+    diesel::sql_query(query).load::<StockCodeName>(conn)
 }
 
