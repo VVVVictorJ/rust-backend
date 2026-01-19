@@ -25,10 +25,13 @@ pub struct StockPlateSyncDetail {
 
 #[derive(Debug)]
 pub struct StockPlateSyncResult {
+    #[allow(dead_code)]
     pub total_count: usize,
     pub success_count: usize,
     pub failed_count: usize,
+    #[allow(dead_code)]
     pub skipped_count: usize,
+    #[allow(dead_code)]
     pub details: Vec<StockPlateSyncDetail>,
 }
 
@@ -149,7 +152,6 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
     let mut failed_count = 0;
     let mut skipped_count = 0;
     let mut details = Vec::with_capacity(stocks.len());
-    let mut last_request_end: Option<Instant> = None;
     let mut consecutive_errors: u32 = 0;
 
     for stock in stocks {
@@ -271,7 +273,6 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                 });
             }
         }
-        last_request_end = Some(Instant::now());
     }
 
     let total_count = success_count + failed_count + skipped_count;
