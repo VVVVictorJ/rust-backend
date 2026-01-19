@@ -344,63 +344,50 @@ pub async fn trigger_stock_plate_sync(
 ) -> Result<Json<TriggerStockPlateSyncResponse>, AppError> {
     tracing::info!("收到手动触发 stock_plate 同步任务的请求");
 
-    crate::utils::ws_broadcast::broadcast_task_status(
-        &state.ws_sender,
-        "stock_plate_sync".to_string(),
-        "running".to_string(),
-    );
+    let pool = state.db_pool.clone();
+    let sender = state.ws_sender.clone();
 
-    match stock_plate_sync_job::run_stock_plate_sync_task(state.db_pool.clone()).await {
-        Ok(result) => {
-            let status = if result.failed_count == 0 {
-                "success"
-            } else if result.success_count > 0 {
-                "partial"
-            } else {
-                "failed"
-            };
-            crate::utils::ws_broadcast::broadcast_task_status(
-                &state.ws_sender,
-                "stock_plate_sync".to_string(),
-                status.to_string(),
-            );
-
-            let details = result
-                .details
-                .into_iter()
-                .map(|d| StockPlateSyncDetail {
-                    stock_code: d.stock_code,
-                    plate_total: d.plate_total,
-                    plate_inserted: d.plate_inserted,
-                    relation_inserted: d.relation_inserted,
-                    action: d.action,
-                    error: d.error,
-                })
-                .collect();
-
-            Ok(Json(TriggerStockPlateSyncResponse {
-                success: result.failed_count == 0,
-                message: format!(
-                    "stock_plate 同步任务执行完成，总计 {} 条，成功 {} 条，失败 {} 条，跳过 {} 条",
-                    result.total_count, result.success_count, result.failed_count, result.skipped_count
-                ),
-                total_count: result.total_count,
-                success_count: result.success_count,
-                failed_count: result.failed_count,
-                skipped_count: result.skipped_count,
-                details,
-            }))
+    tokio::spawn(async move {
+        crate::utils::ws_broadcast::broadcast_task_status(
+            &sender,
+            "stock_plate_sync".to_string(),
+            "running".to_string(),
+        );
+        match stock_plate_sync_job::run_stock_plate_sync_task(pool).await {
+            Ok(result) => {
+                let status = if result.failed_count == 0 {
+                    "success"
+                } else if result.success_count > 0 {
+                    "partial"
+                } else {
+                    "failed"
+                };
+                crate::utils::ws_broadcast::broadcast_task_status(
+                    &sender,
+                    "stock_plate_sync".to_string(),
+                    status.to_string(),
+                );
+            }
+            Err(e) => {
+                tracing::error!("手动触发 stock_plate 同步任务失败: {}", e);
+                crate::utils::ws_broadcast::broadcast_task_status(
+                    &sender,
+                    "stock_plate_sync".to_string(),
+                    "failed".to_string(),
+                );
+            }
         }
-        Err(e) => {
-            tracing::error!("手动触发 stock_plate 同步任务失败: {}", e);
-            crate::utils::ws_broadcast::broadcast_task_status(
-                &state.ws_sender,
-                "stock_plate_sync".to_string(),
-                "failed".to_string(),
-            );
-            Err(AppError::InternalServerError)
-        }
-    }
+    });
+
+    Ok(Json(TriggerStockPlateSyncResponse {
+        success: true,
+        message: "stock_plate 同步任务已触发，后台执行中".to_string(),
+        total_count: 0,
+        success_count: 0,
+        failed_count: 0,
+        skipped_count: 0,
+        details: Vec::new(),
+    }))
 }
 
 /// 获取任务列表

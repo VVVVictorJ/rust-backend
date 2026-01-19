@@ -149,9 +149,18 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
     let mut failed_count = 0;
     let mut skipped_count = 0;
     let mut details = Vec::with_capacity(stocks.len());
+    let mut last_request_end: Option<Instant> = None;
+    let mut consecutive_errors: u32 = 0;
 
     for stock in stocks {
-        let delay_ms = rand::thread_rng().gen_range(120..=260);
+        let base_delay_ms = rand::thread_rng().gen_range(450..=900);
+        let extra_delay_ms = if consecutive_errors > 0 {
+            let capped = consecutive_errors.min(5) as u64;
+            (capped * 400) + rand::thread_rng().gen_range(0..=200) as u64
+        } else {
+            0
+        };
+        let delay_ms = base_delay_ms as u64 + extra_delay_ms;
         sleep(Duration::from_millis(delay_ms)).await;
 
         let request_start = Instant::now();
@@ -159,6 +168,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
         let response = fetch_em_plate_list(&client, &stock.stock_code).await;
         match response {
             Ok(res) => {
+                consecutive_errors = 0;
                 tracing::info!(
                     "板块请求完成: stock_code={}, plates={}, elapsed_ms={}",
                     stock.stock_code,
@@ -241,12 +251,15 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                 });
             }
             Err(e) => {
+                consecutive_errors = consecutive_errors.saturating_add(1);
                 tracing::warn!(
                     "板块请求失败: stock_code={}, elapsed_ms={}, error={}",
                     stock.stock_code,
                     request_start.elapsed().as_millis(),
                     e
                 );
+                let cooldown_ms = rand::thread_rng().gen_range(800..=1500);
+                sleep(Duration::from_millis(cooldown_ms)).await;
                 failed_count += 1;
                 details.push(StockPlateSyncDetail {
                     stock_code: stock.stock_code,
@@ -258,6 +271,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                 });
             }
         }
+        last_request_end = Some(Instant::now());
     }
 
     let total_count = success_count + failed_count + skipped_count;
