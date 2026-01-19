@@ -69,7 +69,7 @@ pub fn query_plate_stocks(
     offset: i64,
 ) -> Result<Vec<StockPlateStockQueryResult>, diesel::result::Error> {
     if let Some(name_filter) = plate_name_filter {
-        let pattern = format!("%{}%", name_filter);
+        let pattern = format!("%{name_filter}%");
         let query = r#"
             SELECT
                 p.id AS plate_id,
@@ -123,7 +123,7 @@ pub fn count_plate_stocks(
     }
 
     if let Some(name_filter) = plate_name_filter {
-        let pattern = format!("%{}%", name_filter);
+        let pattern = format!("%{name_filter}%");
         let query = r#"
             SELECT COUNT(*) AS count
             FROM stock_plate_stock_table rel
@@ -148,4 +148,34 @@ pub fn count_plate_stocks(
             .get_result::<CountResult>(conn)?;
         Ok(result.count)
     }
+}
+
+#[derive(Debug, QueryableByName)]
+pub struct StockPlateRelationInfo {
+    #[diesel(sql_type = Int4)]
+    pub plate_id: i32,
+    #[diesel(sql_type = Text)]
+    pub plate_code: String,
+    #[diesel(sql_type = Text)]
+    pub plate_name: String,
+}
+
+pub fn list_by_stock_table_id(
+    conn: &mut PgPoolConn,
+    stock_table_id_val: i32,
+) -> Result<Vec<StockPlateRelationInfo>, diesel::result::Error> {
+    let query = r#"
+        SELECT
+            rel.plate_id AS plate_id,
+            p.plate_code AS plate_code,
+            p.name AS plate_name
+        FROM stock_plate_stock_table rel
+        JOIN stock_plate p ON rel.plate_id = p.id
+        WHERE rel.stock_table_id = $1
+        ORDER BY p.id
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<Int4, _>(stock_table_id_val)
+        .load::<StockPlateRelationInfo>(conn)
 }
