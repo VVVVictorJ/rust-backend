@@ -236,9 +236,9 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
             
             // 筛选 f137 > 0
             let f137 = data.get("f137").and_then(|x| x.as_f64());
-            if f137.unwrap_or(0.0) <= 0.0 {
-                return None;
-            }
+            // if f137.unwrap_or(0.0) <= 0.0 {
+            //     return None;
+            // }
             let item = FilteredStockItem {
                 f57: data.get("f57").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
                 f58: data.get("f58").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
