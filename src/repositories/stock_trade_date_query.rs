@@ -1,8 +1,9 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{BigInt, Numeric, Text, Timestamptz, Nullable};
+use diesel::sql_types::{BigInt, Numeric, Text, Timestamptz, Nullable, Jsonb};
 use bigdecimal::BigDecimal;
+use serde_json::Value;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
@@ -29,6 +30,8 @@ pub struct TradeDateQueryResult {
     pub main_force_inflow: BigDecimal,
     #[diesel(sql_type = Timestamptz)]
     pub created_at: DateTime<Utc>,
+    #[diesel(sql_type = Jsonb)]
+    pub plates: Value,
 }
 
 /// 根据交易日期查询股票快照数据（分页）
@@ -49,12 +52,31 @@ pub fn query_by_trade_date(
             a.turnover_rate,
             a.bid_ask_ratio,
             a.main_force_inflow,
-            a.created_at
+            a.created_at,
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object('plate_code', sp.plate_code, 'name', sp.name))
+                    FILTER (WHERE sp.id IS NOT NULL),
+                '[]'::jsonb
+            ) AS plates
         FROM stock_snapshots a 
         LEFT JOIN daily_klines dk ON a.stock_code = dk.stock_code 
+        LEFT JOIN stock_table st ON a.stock_code = st.stock_code
+        LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
+        LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
         WHERE a.main_force_inflow > 0
           AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = dk.trade_date 
           AND dk.trade_date = $1
+        GROUP BY
+            a.stock_code,
+            a.stock_name,
+            a.latest_price,
+            dk.close_price,
+            a.change_pct,
+            a.volume_ratio,
+            a.turnover_rate,
+            a.bid_ask_ratio,
+            a.main_force_inflow,
+            a.created_at
         ORDER BY a.main_force_inflow DESC
         LIMIT $2 OFFSET $3
     "#;

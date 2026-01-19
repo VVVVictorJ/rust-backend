@@ -3,9 +3,10 @@ use axum::{
     Json,
 };
 use chrono::NaiveDate;
+use serde_json;
 
 use crate::api_models::stock_trade_date_query::{
-    TradeDateQueryRequest, TradeDateQueryItem, TradeDateQueryResponse,
+    PlateInfo, TradeDateQueryRequest, TradeDateQueryItem, TradeDateQueryResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
@@ -59,7 +60,10 @@ pub async fn query_by_trade_date(
     // 转换结果
     let data = results
         .into_iter()
-        .map(|r| TradeDateQueryItem {
+        .map(|r| {
+            let plates: Vec<PlateInfo> = serde_json::from_value(r.plates).unwrap_or_default();
+
+            TradeDateQueryItem {
             stock_code: r.stock_code,
             stock_name: r.stock_name,
             latest_price: r.latest_price,
@@ -70,6 +74,8 @@ pub async fn query_by_trade_date(
             bid_ask_ratio: r.bid_ask_ratio,
             main_force_inflow: r.main_force_inflow,
             created_at: r.created_at,
+            plates,
+        }
         })
         .collect();
 

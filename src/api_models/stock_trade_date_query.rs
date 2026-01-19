@@ -2,6 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use bigdecimal::BigDecimal;
 
+/// 板块信息
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PlateInfo {
+    pub plate_code: String,
+    pub name: String,
+}
+
 /// 交易日期查询请求
 #[derive(Debug, Deserialize)]
 pub struct TradeDateQueryRequest {
@@ -36,6 +43,7 @@ pub struct TradeDateQueryItem {
     pub bid_ask_ratio: BigDecimal,
     pub main_force_inflow: BigDecimal,
     pub created_at: DateTime<Utc>,
+    pub plates: Vec<PlateInfo>,
 }
 
 /// 交易日期查询响应（分页）
