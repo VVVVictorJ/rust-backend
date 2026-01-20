@@ -34,6 +34,14 @@ pub struct TradeDateQueryResult {
     pub plates: Value,
 }
 
+#[derive(Debug, QueryableByName)]
+pub struct TradeDateStockInfo {
+    #[diesel(sql_type = Text)]
+    pub stock_code: String,
+    #[diesel(sql_type = Text)]
+    pub stock_name: String,
+}
+
 /// 根据交易日期查询股票快照数据（分页）
 pub fn query_by_trade_date(
     conn: &mut PgPoolConn,
@@ -151,5 +159,25 @@ pub fn count_by_trade_date(
         .get_result::<CountResult>(conn)?;
 
     Ok(result.count)
+}
+
+/// 根据交易日期查询去重后的股票列表
+pub fn list_stocks_by_trade_date(
+    conn: &mut PgPoolConn,
+    trade_date: NaiveDate,
+) -> Result<Vec<TradeDateStockInfo>, diesel::result::Error> {
+    let query = r#"
+        SELECT DISTINCT
+            a.stock_code,
+            a.stock_name
+        FROM stock_snapshots a
+        WHERE
+            (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = $1::date
+        ORDER BY a.stock_code;
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<diesel::sql_types::Date, _>(trade_date)
+        .load::<TradeDateStockInfo>(conn)
 }
 

@@ -28,6 +28,8 @@ pub use kline_import::{ImportKlineRequest, ImportKlineResponse};
 #[allow(unused_imports)]
 pub use stock_trade_date_query::{TradeDateQueryRequest, TradeDateQueryItem, TradeDateQueryResponse};
 #[allow(unused_imports)]
+pub use stock_trade_date_query::{TradeDatePlateRefreshRequest, TradeDatePlateRefreshResponse};
+#[allow(unused_imports)]
 pub use stock_price_compare::{PriceCompareRequest, PriceCompareItem, PriceCompareResponse};
 #[allow(unused_imports)]
 pub use scheduler::{JobInfo, HistoryQueryParams, JobExecutionHistoryResponse, JobExecutionHistoryItem};

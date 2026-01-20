@@ -22,6 +22,13 @@ pub struct TradeDateQueryRequest {
     pub page_size: i64,
 }
 
+/// 交易日板块补全请求
+#[derive(Debug, Deserialize)]
+pub struct TradeDatePlateRefreshRequest {
+    /// 交易日期，格式：YYYY-MM-DD
+    pub trade_date: String,
+}
+
 fn default_page() -> i64 {
     1
 }
@@ -59,5 +66,17 @@ pub struct TradeDateQueryResponse {
     pub page_size: i64,
     /// 总页数
     pub total_pages: i64,
+}
+
+/// 交易日板块补全响应
+#[derive(Debug, Serialize)]
+pub struct TradeDatePlateRefreshResponse {
+    pub total_count: i64,
+    pub missing_count: i64,
+    pub stock_table_inserted: i64,
+    pub plate_inserted: i64,
+    pub plate_updated: i64,
+    pub relation_inserted: i64,
+    pub failed_count: i64,
 }
 

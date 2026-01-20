@@ -18,6 +18,16 @@ pub fn find_by_id(conn: &mut PgPoolConn, stock_id: i32) -> Result<StockTable, di
     stock_table.find(stock_id).first(conn)
 }
 
+pub fn find_by_code(
+    conn: &mut PgPoolConn,
+    code: &str,
+) -> Result<Option<StockTable>, diesel::result::Error> {
+    stock_table
+        .filter(stock_code.eq(code))
+        .first::<StockTable>(conn)
+        .optional()
+}
+
 pub fn list_all(conn: &mut PgPoolConn) -> Result<Vec<StockTable>, diesel::result::Error> {
     stock_table.order(id.asc()).load(conn)
 }
