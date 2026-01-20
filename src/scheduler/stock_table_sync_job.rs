@@ -25,7 +25,7 @@ pub struct StockTableSyncResult {
     pub details: Vec<StockTableSyncDetail>,
 }
 
-/// 创建 stock_table 同步任务（每天 UTC+8 04:00 执行）
+/// 创建 stock_table 同步任务（每天 UTC+8 17:30 执行）
 pub async fn create_stock_table_sync_job(
     scheduler: &JobScheduler,
     db_pool: DbPool,
@@ -34,7 +34,7 @@ pub async fn create_stock_table_sync_job(
     let job = JobBuilder::new()
         .with_timezone(Shanghai)
         .with_cron_job_type()
-        .with_schedule("0 0 4 * * *")?
+        .with_schedule("0 30 17 * * *")?
         .with_run_async(Box::new(move |_uuid, _l| {
             let pool = db_pool.clone();
             let sender = ws_sender.clone();
