@@ -1,0 +1,14 @@
+| 错误码                 | 描述                                   |
+| ---------------------- | -------------------------------------- |
+| INTERNAL_ERROR         | 系统内部异常。                         |
+| INVALID_PARAMETER      | 参数错误（包含参数格式、类型等错误）。 |
+| INVALID_KEY            | Key不存在或已过期。                    |
+| UNAVAILABLE_KEY        | Key不可用，已过期或被封禁              |
+| ACCESS_DENY            | Key没有此接口的权限。                  |
+| API_AUTH_DENY          | Api授权不通过，请检查API鉴权配置       |
+| KEY_BLOCK              | Key被封禁。                            |
+| REQUEST_LIMIT_EXCEEDED | 请求频率超出限制。                     |
+| BALANCE_INSUFFICIENT   | Key余额不足。                          |
+| NO_RESOURCE_FOUND      | 资源不足。                             |
+| FAILED_OPERATION       | 提取失败。                             |
+| EXTRACT_LIMIT_EXCEEDED | 超出提取配额。                         |
