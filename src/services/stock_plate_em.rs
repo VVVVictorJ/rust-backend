@@ -1,10 +1,14 @@
-use reqwest::Client;
+use reqwest::header::HeaderMap;
+use reqwest::{Client, Url};
 use serde_json::Value;
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use rand::Rng;
+use std::sync::Arc;
 
 use crate::api_models::stock_plate_em::{EmPlateItem, EmPlateResponse};
+use crate::utils::proxy::{proxy_get_json, ProxyClient, ProxyError};
 use crate::utils::secid::code_to_secid;
 
 const EM_PLATE_URL: &str = "https://push2.eastmoney.com/api/qt/slist/get";
@@ -13,18 +17,21 @@ const EM_PLATE_URL: &str = "https://push2.eastmoney.com/api/qt/slist/get";
 pub enum EmPlateError {
     #[error("http error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("proxy error: {0}")]
+    Proxy(#[from] ProxyError),
     #[error("serde_json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
-    #[error("bad status: {0}")]
-    BadStatus(u16),
     #[error("missing data field")]
     MissingData,
+    #[error("url parse error: {0}")]
+    Url(String),
 }
 
 pub async fn fetch_em_plate_list(
-    client: &Client,
+    _client: &Client,
     stock_code: &str,
 ) -> Result<EmPlateResponse, EmPlateError> {
+    let _ = _client;
     let ut = "fa5fd1943c7b386f172d6893dbfba10b";
     let fields = "f14,f12";
     let secid = code_to_secid(stock_code);
@@ -37,14 +44,16 @@ pub async fn fetch_em_plate_list(
     let spt = "3";
     let wbp2u = "|0|0|0|web";
     let timestamp = chrono::Utc::now().timestamp_millis().to_string();
+    let headers = HeaderMap::new();
+    let proxy_client = Arc::new(Mutex::new(ProxyClient::from_env()?));
 
     let mut attempt = 0;
     let max_attempts = 3;
     let json: Value = loop {
         attempt += 1;
-        let resp = client
-            .get(EM_PLATE_URL)
-            .query(&[
+        let url = Url::parse_with_params(
+            EM_PLATE_URL,
+            [
                 ("fltt", fltt),
                 ("invt", invt),
                 ("fields", fields),
@@ -57,34 +66,12 @@ pub async fn fetch_em_plate_list(
                 ("spt", spt),
                 ("wbp2u", wbp2u),
                 ("_", timestamp.as_str()),
-            ])
-            .send()
-            .await;
+            ],
+        )
+        .map_err(|err| EmPlateError::Url(err.to_string()))?;
 
-        match resp {
-            Ok(resp) => {
-                let status = resp.status();
-                let body = resp.text().await?;
-                if !status.is_success() {
-                    let retryable = matches!(
-                        status.as_u16(),
-                        429 | 500 | 502 | 503 | 504
-                    );
-                    if retryable && attempt < max_attempts {
-                        let backoff = 200_u64.saturating_mul(attempt as u64);
-                        let jitter = rand::thread_rng().gen_range(0..=150);
-                        tracing::warn!(
-                            "EM 板块接口返回非成功状态，准备重试: status={}, attempt={}",
-                            status,
-                            attempt
-                        );
-                        sleep(Duration::from_millis(backoff + jitter)).await;
-                        continue;
-                    }
-                    return Err(EmPlateError::BadStatus(status.as_u16()));
-                }
-                break serde_json::from_str(&body)?;
-            }
+        match proxy_get_json(&proxy_client, url, &headers).await {
+            Ok(json) => break json,
             Err(e) => {
                 if attempt < max_attempts {
                     let backoff = 200_u64.saturating_mul(attempt as u64);
@@ -97,7 +84,7 @@ pub async fn fetch_em_plate_list(
                     sleep(Duration::from_millis(backoff + jitter)).await;
                     continue;
                 }
-                return Err(EmPlateError::Http(e));
+                return Err(e.into());
             }
         }
     };

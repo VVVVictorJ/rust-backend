@@ -3,13 +3,15 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use polars::prelude::*;
-use reqwest::Client;
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_ENCODING, REFERER, USER_AGENT};
+use reqwest::{Client, Url};
 use serde_json::Value;
 use thiserror::Error;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 
 use crate::api_models::stock::FilteredStockItem;
 use crate::utils::percent::normalize_percent_scalar;
+use crate::utils::proxy::{proxy_get_json, ProxyClient, ProxyError};
 use crate::utils::secid::code_to_secid;
 
 const EM_LIST_URL: &str = "https://push2.eastmoney.com/api/qt/clist/get";
@@ -19,8 +21,12 @@ const EM_DETAIL_URL: &str = "https://push2.eastmoney.com/api/qt/stock/get";
 pub enum StockFilterError {
     #[error("http error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("proxy error: {0}")]
+    Proxy(#[from] ProxyError),
     #[error("polars error: {0}")]
     Polars(#[from] PolarsError),
+    #[error("url parse error: {0}")]
+    Url(String),
 }
 
 #[derive(Debug, Clone)]
@@ -50,30 +56,16 @@ impl Default for FilterParams {
     }
 }
 
-pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) -> Result<Value, StockFilterError> {
+pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -> Result<Value, StockFilterError> {
     // clamp
     let concurrency = params.concurrency.clamp(1, 64);
     let pz = params.pz.clamp(100, 5000);
+    let headers = em_headers();
+    let proxy_client = Arc::new(Mutex::new(ProxyClient::from_env()?));
 
     // page 1 for total and first diff
-    let first = client
-        .get(EM_LIST_URL)
-        .query(&[
-            ("fs", "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23"),
-            ("fields", "f12,f14,f15,f3,f10,f8"),
-            ("fid", "f3"),
-            ("po", "1"),
-            ("np", "1"),
-            ("fltt", "2"),
-            ("invt", "2"),
-            ("ut", "bd1d9ddb04089700cf9c27f6f7426281"),
-            ("pn", "1"),
-            ("pz", &pz.to_string()),
-        ])
-        .send()
-        .await?
-        .json::<Value>()
-        .await?;
+    let first_url = build_list_url(1, pz)?;
+    let first = proxy_get_json(&proxy_client, first_url, &headers).await?;
 
     let data = first.get("data").cloned().unwrap_or(Value::Null);
     let total = data.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -88,35 +80,15 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     let mut handles = Vec::new();
     for pn in 2..=pages {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let c = client.clone();
-        let pz_s = pz.to_string();
+        let proxy = proxy_client.clone();
+        let headers = headers.clone();
         let h = tokio::spawn(async move {
             let _p = permit;
-            let resp = match c
-                .get(EM_LIST_URL)
-                .query(&[
-                    ("fs", "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23"),
-                    ("fields", "f12,f14,f15,f3,f10,f8"),
-                    ("fid", "f3"),
-                    ("po", "1"),
-                    ("np", "1"),
-                    ("fltt", "2"),
-                    ("invt", "2"),
-                    ("ut", "bd1d9ddb04089700cf9c27f6f7426281"),
-                    ("pn", &pn.to_string()),
-                    ("pz", &pz_s),
-                ])
-                .send()
-                .await
-            {
-                Ok(r) => r,
+            let url = match build_list_url(pn, pz) {
+                Ok(url) => url,
                 Err(_) => return None,
             };
-            let v: Value = match resp.json().await {
-                Ok(v) => v,
-                Err(_) => return None,
-            };
-            Some(v)
+            (proxy_get_json(&proxy, url, &headers).await).ok()
         });
         handles.push(h);
     }
@@ -195,27 +167,17 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     let mut handles = Vec::new();
     for code in codes {
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let c = client.clone();
+        let proxy = proxy_client.clone();
+        let headers = headers.clone();
         let wb_min = params.wb_min;
         let h = tokio::spawn(async move {
             let _p = permit;
             let secid = code_to_secid(&code);
-            let resp = c
-                .get(EM_DETAIL_URL)
-                .query(&[
-                    ("secid", secid.as_str()),
-                    ("fields", "f57,f58,f43,f170,f50,f168,f191,f137"),
-                    ("fltt", "2"),
-                    ("invt", "2"),
-                    ("ut", "bd1d9ddb04089700cf9c27f6f7426281"),
-                ])
-                .send()
-                .await;
-            let resp = match resp {
-                Ok(r) => r,
+            let url = match build_detail_url(&secid) {
+                Ok(url) => url,
                 Err(_) => return None,
             };
-            let v: Value = match resp.json().await {
+            let v: Value = match proxy_get_json(&proxy, url, &headers).await {
                 Ok(v) => v,
                 Err(_) => return None,
             };
@@ -265,3 +227,53 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     });
     Ok(out)
 }
+
+pub async fn get_filtered_stocks_param_with_proxy(params: FilterParams) -> Result<Value, StockFilterError> {
+    let client = Client::new();
+    get_filtered_stocks_param(&client, params).await
+}
+
+fn em_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        USER_AGENT,
+        HeaderValue::from_static(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ),
+    );
+    headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/plain, */*"));
+    headers.insert(REFERER, HeaderValue::from_static("https://quote.eastmoney.com"));
+    headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
+    headers
+}
+
+fn build_list_url(pn: i32, pz: i32) -> Result<Url, StockFilterError> {
+    let params = vec![
+        ("fs".to_string(), "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23".to_string()),
+        ("fields".to_string(), "f12,f14,f15,f3,f10,f8".to_string()),
+        ("fid".to_string(), "f3".to_string()),
+        ("po".to_string(), "1".to_string()),
+        ("np".to_string(), "1".to_string()),
+        ("fltt".to_string(), "2".to_string()),
+        ("invt".to_string(), "2".to_string()),
+        ("ut".to_string(), "bd1d9ddb04089700cf9c27f6f7426281".to_string()),
+        ("pn".to_string(), pn.to_string()),
+        ("pz".to_string(), pz.to_string()),
+    ];
+    Url::parse_with_params(EM_LIST_URL, params)
+        .map_err(|err| StockFilterError::Url(err.to_string()))
+}
+
+fn build_detail_url(secid: &str) -> Result<Url, StockFilterError> {
+    let params = vec![
+        ("secid".to_string(), secid.to_string()),
+        ("fields".to_string(), "f57,f58,f43,f170,f50,f168,f191,f137".to_string()),
+        ("fltt".to_string(), "2".to_string()),
+        ("invt".to_string(), "2".to_string()),
+        ("ut".to_string(), "bd1d9ddb04089700cf9c27f6f7426281".to_string()),
+    ];
+    Url::parse_with_params(EM_DETAIL_URL, params)
+        .map_err(|err| StockFilterError::Url(err.to_string()))
+}
+
+// proxy_get_json moved to utils::proxy::http for reuse

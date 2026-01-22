@@ -3,8 +3,7 @@ use chrono_tz::Asia::Shanghai;
 use crate::app::DbPool;
 use crate::models::{NewJobExecutionHistory, NewStockRequest, NewStockSnapshot, UpdateJobExecutionHistory};
 use crate::repositories::{job_execution_history, stock_request, stock_snapshot};
-use crate::services::stock_filter::{get_filtered_stocks_param, FilterParams};
-use crate::utils::http_client;
+use crate::services::stock_filter::{get_filtered_stocks_param_with_proxy, FilterParams};
 use crate::utils::bigdecimal_parser::parse_bigdecimal;
 use serde_json::Value;
 
@@ -154,11 +153,8 @@ pub async fn run_stock_filter_task(db_pool: DbPool, session: &str) -> anyhow::Re
     // 使用默认参数
     let params = FilterParams::default();
     
-    // 创建 HTTP 客户端
-    let client = http_client::create_em_client()?;
-    
-    // 调用筛选服务
-    let result = get_filtered_stocks_param(&client, params).await;
+    // 调用筛选服务（内部使用代理）
+    let result = get_filtered_stocks_param_with_proxy(params).await;
     
     let (items_count, success, error_msg) = match result {
         Ok(ref json_result) => {

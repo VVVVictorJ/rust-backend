@@ -54,8 +54,6 @@ impl ProxyConfig {
 #[derive(Debug, Clone)]
 struct CachedProxy {
     client: Client,
-    proxy_ip: String,
-    server: String,
     deadline: DateTime<Local>,
 }
 
@@ -70,6 +68,7 @@ pub struct ProxyClient {
     api_url: String,
     auth_key: String,
     auth_pwd: String,
+    #[allow(dead_code)]
     max_retries: usize,
     timeout: StdDuration,
     cached: Option<CachedProxy>,
@@ -91,15 +90,22 @@ impl ProxyClient {
         Ok(Self::new(ProxyConfig::from_env()?))
     }
 
+    #[allow(dead_code)]
     pub fn invalidate_proxy(&mut self) {
         self.cached = None;
     }
 
+    pub async fn get_client(&mut self) -> Result<Client, ProxyError> {
+        self.ensure_proxy_client().await
+    }
+
+    #[allow(dead_code)]
     pub async fn get_with_proxy(&mut self, url: &str) -> Result<String, ProxyError> {
         self.request_with_proxy(Method::GET, url, None, None)
             .await
     }
 
+    #[allow(dead_code)]
     pub async fn request_with_proxy(
         &mut self,
         method: Method,
@@ -153,8 +159,6 @@ impl ProxyClient {
         let client = self.build_proxy_client(&proxy_entry.server)?;
         self.cached = Some(CachedProxy {
             client: client.clone(),
-            proxy_ip: proxy_entry.proxy_ip,
-            server: proxy_entry.server,
             deadline: proxy_entry.deadline,
         });
         Ok(client)
@@ -162,32 +166,43 @@ impl ProxyClient {
 
     async fn fetch_proxy(&self) -> Result<ProxyEntry, ProxyError> {
         let client = Client::builder().timeout(self.timeout).build()?;
-        let resp = client.get(&self.api_url).send().await?;
-        let status = resp.status();
-        let text = resp.text().await?;
-        if !status.is_success() {
-            return Err(ProxyError::Status { status, body: text });
+        for attempt in 1..=self.max_retries {
+            let resp = client.get(&self.api_url).send().await?;
+            let status = resp.status();
+            let text = resp.text().await?;
+            if !status.is_success() {
+                return Err(ProxyError::Status { status, body: text });
+            }
+
+            let api_resp: ProxyApiResponse = serde_json::from_str(&text)
+                .map_err(|err| ProxyError::Parse(format!("解析代理响应失败: {err}")))?;
+
+            if api_resp.code != "SUCCESS" {
+                let code = api_resp.code;
+                let request_id = api_resp.request_id;
+
+                // 对提取失败进行容错重试
+                if matches!(code.as_str(), "FAILED_OPERATION" | "NO_RESOURCE_FOUND") && attempt < self.max_retries {
+                    continue;
+                }
+
+                return Err(ProxyError::Api {
+                    code: code.clone(),
+                    message: map_error_message(&code).to_string(),
+                    request_id,
+                });
+            }
+
+            let entry = api_resp
+                .data
+                .into_iter()
+                .next()
+                .ok_or(ProxyError::NoProxyData)?;
+
+            return Ok(ProxyEntry::from_raw(entry));
         }
 
-        let api_resp: ProxyApiResponse = serde_json::from_str(&text)
-            .map_err(|err| ProxyError::Parse(format!("解析代理响应失败: {err}")))?;
-
-        if api_resp.code != "SUCCESS" {
-            let code = api_resp.code;
-            return Err(ProxyError::Api {
-                code: code.clone(),
-                message: map_error_message(&code).to_string(),
-                request_id: api_resp.request_id,
-            });
-        }
-
-        let entry = api_resp
-            .data
-            .into_iter()
-            .next()
-            .ok_or(ProxyError::NoProxyData)?;
-
-        Ok(ProxyEntry::from_raw(entry))
+        Err(ProxyError::NoProxyData)
     }
 
     fn build_proxy_client(&self, server: &str) -> Result<Client, ProxyError> {
@@ -211,7 +226,6 @@ struct ProxyApiResponse {
 
 #[derive(Debug, Deserialize)]
 struct ProxyEntryRaw {
-    proxy_ip: String,
     server: String,
     #[allow(dead_code)]
     area_code: Option<i64>,
@@ -224,7 +238,6 @@ struct ProxyEntryRaw {
 
 #[derive(Debug)]
 struct ProxyEntry {
-    proxy_ip: String,
     server: String,
     deadline: DateTime<Local>,
 }
@@ -232,7 +245,6 @@ struct ProxyEntry {
 impl ProxyEntry {
     fn from_raw(raw: ProxyEntryRaw) -> Self {
         Self {
-            proxy_ip: raw.proxy_ip,
             server: raw.server,
             deadline: parse_deadline(&raw.deadline),
         }
@@ -248,3 +260,5 @@ fn parse_deadline(deadline: &str) -> DateTime<Local> {
 
     Local::now() + Duration::seconds(DEFAULT_TTL_SECS)
 }
+
+

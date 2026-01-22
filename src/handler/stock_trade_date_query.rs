@@ -14,8 +14,8 @@ use crate::handler::error::AppError;
 use crate::models::{NewStockPlate, NewStockPlateStockTable, NewStockTable, UpdateStockPlate};
 use crate::repositories::{stock_plate, stock_plate_stock_table, stock_table, stock_trade_date_query};
 use crate::services::stock_plate_em::fetch_em_plate_list;
-use crate::utils::http_client::create_em_client;
 use chrono::Local;
+use reqwest::Client;
 
 /// 根据交易日期查询股票快照数据
 pub async fn query_by_trade_date(
@@ -133,7 +133,7 @@ pub async fn refresh_missing_plates(
         }));
     }
 
-    let client = create_em_client().map_err(|_| AppError::InternalServerError)?;
+    let client = Client::new();
     let mut missing_count = 0_i64;
     let mut stock_table_inserted = 0_i64;
     let mut plate_inserted = 0_i64;
