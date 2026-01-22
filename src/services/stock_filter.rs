@@ -1,13 +1,10 @@
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use polars::prelude::*;
 use reqwest::Client;
-use serde_json::{json, Value};
-use std::fs::OpenOptions;
-use std::io::Write;
+use serde_json::Value;
 use thiserror::Error;
 use tokio::sync::Semaphore;
 
@@ -57,25 +54,6 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     // clamp
     let concurrency = params.concurrency.clamp(1, 64);
     let pz = params.pz.clamp(100, 5000);
-    // #region agent log
-    let _ = append_debug_log(
-        "A",
-        "stock_filter.rs:get_filtered_stocks_param:entry",
-        "enter get_filtered_stocks_param",
-        json!({
-            "pct_min": params.pct_min,
-            "pct_max": params.pct_max,
-            "lb_min": params.lb_min,
-            "hs_min": params.hs_min,
-            "wb_min": params.wb_min,
-            "concurrency": params.concurrency,
-            "concurrency_clamped": concurrency,
-            "limit": params.limit,
-            "pz": params.pz,
-            "pz_clamped": pz
-        }),
-    );
-    // #endregion
 
     // page 1 for total and first diff
     let first = client
@@ -104,19 +82,6 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
         all.extend_from_slice(diff);
     }
     let pages = if total <= 0 { 1 } else { (total as i32 + pz - 1) / pz };
-    // #region agent log
-    let _ = append_debug_log(
-        "B",
-        "stock_filter.rs:get_filtered_stocks_param:first_page",
-        "first page parsed",
-        json!({
-            "total": total,
-            "diff_len": data.get("diff").and_then(|v| v.as_array()).map(|v| v.len()),
-            "all_len": all.len(),
-            "pages": pages
-        }),
-    );
-    // #endregion
 
     // fetch rest pages with limited concurrency
     let semaphore = Arc::new(Semaphore::new(concurrency));
@@ -205,83 +170,19 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
         Series::new("f10", col_f10),
         Series::new("f8", col_f8),
     ])?;
-    // #region agent log
-    let _ = append_debug_log(
-        "B",
-        "stock_filter.rs:get_filtered_stocks_param:dataframe",
-        "dataframe built",
-        json!({
-            "height": df.height(),
-            "width": df.width(),
-            "dtypes": df.get_columns().iter().map(|s| s.dtype().to_string()).collect::<Vec<_>>()
-        }),
-    );
-    // #endregion
 
     let lf = df
         .lazy()
         .filter(col("f3").gt(params.pct_min).and(col("f3").lt(params.pct_max)))
         .filter(col("f10").gt(params.lb_min))
         .filter(col("f8").gt(params.hs_min));
-    // #region agent log
-    let _ = append_debug_log(
-        "C",
-        "stock_filter.rs:get_filtered_stocks_param:before_collect",
-        "before collect",
-        json!({ "filters": "f3,f10,f8" }),
-    );
-    // #endregion
     let filtered = lf.collect()?;
-    // #region agent log
-    let _ = append_debug_log(
-        "C",
-        "stock_filter.rs:get_filtered_stocks_param:after_collect",
-        "after collect",
-        json!({ "height": filtered.height(), "width": filtered.width() }),
-    );
-    // #endregion
 
     // collect codes
     let mut codes: Vec<String> = Vec::new();
     let mut seen = HashSet::new();
-    let col_f12 = match filtered.column("f12") {
-        Ok(c) => {
-            // #region agent log
-            let _ = append_debug_log(
-                "A",
-                "stock_filter.rs:get_filtered_stocks_param:col_f12",
-                "f12 column dtype",
-                json!({ "dtype": c.dtype().to_string() }),
-            );
-            // #endregion
-            c
-        }
-        Err(e) => {
-            // #region agent log
-            let _ = append_debug_log(
-                "A",
-                "stock_filter.rs:get_filtered_stocks_param:col_f12_error",
-                "failed to access f12 column",
-                json!({ "error": e.to_string() }),
-            );
-            // #endregion
-            return Err(e.into());
-        }
-    };
-    let col_f12_str = match col_f12.str() {
-        Ok(s) => s,
-        Err(e) => {
-            // #region agent log
-            let _ = append_debug_log(
-                "A",
-                "stock_filter.rs:get_filtered_stocks_param:f12_str_error",
-                "failed to cast f12 to string",
-                json!({ "error": e.to_string() }),
-            );
-            // #endregion
-            return Err(e.into());
-        }
-    };
+    let col_f12 = filtered.column("f12")?;
+    let col_f12_str = col_f12.str()?;
     for s in col_f12_str.into_iter().flatten() {
         let code = s.to_string();
         if seen.insert(code.clone()) {
@@ -364,27 +265,3 @@ pub async fn get_filtered_stocks_param(client: &Client, params: FilterParams) ->
     });
     Ok(out)
 }
-
-fn append_debug_log(hypothesis_id: &str, location: &str, message: &str, data: Value) -> std::io::Result<()> {
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64;
-    let payload = json!({
-        "sessionId": "debug-session",
-        "runId": "pre-fix",
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": ts
-    });
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(r"e:\code\python\stockProject\.cursor\debug.log")?;
-    writeln!(file, "{payload}")?;
-    Ok(())
-}
-
-

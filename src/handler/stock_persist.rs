@@ -19,13 +19,6 @@ pub async fn get_filtered_stocks_param_with_persist(
     State(state): State<AppState>,
     Query(p): Query<FilterParamQuery>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    // #region agent log
-    tracing::info!(
-        "[DEBUG] stock_persist entry: pct_min={}, pct_max={}, lb_min={}, hs_min={}, wb_min={}, concurrency={}, limit={}, pz={}",
-        p.pct_min, p.pct_max, p.lb_min, p.hs_min, p.wb_min, p.concurrency, p.limit, p.pz
-    );
-    // #endregion
-
     // 构建筛选参数
     let params = FilterParams {
         pct_min: p.pct_min,
@@ -57,65 +50,44 @@ pub async fn get_filtered_stocks_param_with_persist(
             .unwrap()
     };
 
-    // #region agent log
-    tracing::info!("[DEBUG] stock_persist before_svc_call");
-    // #endregion
-
     // 调用现有服务函数获取筛选结果
     let result = match svc_get_filtered_stocks_param(&client, params).await {
-        Ok(r) => {
-            // #region agent log
-            let count = r.get("count");
-            let items_len = r.get("items").and_then(|v| v.as_array()).map(|a| a.len());
-            tracing::info!("[DEBUG] stock_persist svc_call_ok: count={:?}, items_len={:?}", count, items_len);
-            // #endregion
-            r
-        }
+        Ok(r) => r,
         Err(e) => {
-            // #region agent log
-            tracing::error!("[DEBUG] stock_persist svc_call_error: {}", e);
-            // #endregion
+            // 外部 API 请求失败，返回 503 Service Unavailable
+            let err_msg = e.to_string();
+            let is_network_error = err_msg.contains("http error") || err_msg.contains("error sending request");
+            if is_network_error {
+                return Err((
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(serde_json::json!({
+                        "error": "upstream_unavailable",
+                        "message": "无法连接东方财富 API，请稍后重试或检查网络",
+                        "detail": err_msg
+                    })),
+                ));
+            }
             return Err(internal_error(e));
         }
     };
 
     // 检查 items 是否非空
     let items = result.get("items").and_then(|v| v.as_array());
-    // #region agent log
-    tracing::info!("[DEBUG] stock_persist check_items: items_is_some={}, items_len={:?}", items.is_some(), items.map(|a| a.len()));
-    // #endregion
     if let Some(items_arr) = items {
         if !items_arr.is_empty() {
             // 尝试持久化到数据库（失败不影响 API 返回）
             if let Err(e) = persist_to_db(&state, items_arr).await {
-                // #region agent log
-                tracing::error!("[DEBUG] stock_persist persist_error: {}", e);
-                // #endregion
                 tracing::warn!("Failed to persist stock data: {}", e);
             }
         }
     }
 
-    // #region agent log
-    tracing::info!("[DEBUG] stock_persist return_ok");
-    // #endregion
     Ok((StatusCode::OK, Json(result)))
 }
 
 /// 将筛选结果持久化到数据库
 async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // #region agent log
-    tracing::info!("[DEBUG] persist_to_db entry: items_len={}", items.len());
-    // #endregion
-    let mut conn = match state.db_pool.get() {
-        Ok(c) => c,
-        Err(e) => {
-            // #region agent log
-            tracing::error!("[DEBUG] persist_to_db pool_error: {}", e);
-            // #endregion
-            return Err(Box::new(e));
-        }
-    };
+    let mut conn = state.db_pool.get()?;
 
     // 1. 插入 stock_requests 记录
     let now_date = chrono::Utc::now().date_naive();
@@ -165,4 +137,3 @@ async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn 
 
     Ok(())
 }
-
