@@ -383,7 +383,7 @@ fn append_debug_log(hypothesis_id: &str, location: &str, message: &str, data: Va
         .create(true)
         .append(true)
         .open(r"e:\code\python\stockProject\.cursor\debug.log")?;
-    writeln!(file, "{}", payload.to_string())?;
+    writeln!(file, "{payload}")?;
     Ok(())
 }
 
