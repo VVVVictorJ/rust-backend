@@ -20,6 +20,7 @@ use crate::utils::ws_broadcast::TaskStatusSender;
 #[derive(Debug, Serialize)]
 pub struct StockPlateSyncDetail {
     pub stock_code: String,
+    pub stock_name: String,
     pub plate_total: usize,
     pub plate_inserted: usize,
     pub plate_updated: usize,
@@ -187,6 +188,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                     skipped_count += 1;
                     details.push(StockPlateSyncDetail {
                         stock_code: stock.stock_code,
+                        stock_name: stock.stock_name,
                         plate_total: 0,
                         plate_inserted: 0,
                         plate_updated: 0,
@@ -318,6 +320,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                 };
                 details.push(StockPlateSyncDetail {
                     stock_code: stock.stock_code,
+                    stock_name: stock.stock_name,
                     plate_total: res.total as usize,
                     plate_inserted,
                     plate_updated,
@@ -340,6 +343,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                 failed_count += 1;
                 details.push(StockPlateSyncDetail {
                     stock_code: stock.stock_code,
+                    stock_name: stock.stock_name,
                     plate_total: 0,
                     plate_inserted: 0,
                     plate_updated: 0,

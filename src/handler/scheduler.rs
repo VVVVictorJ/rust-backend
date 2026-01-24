@@ -222,6 +222,7 @@ pub struct TriggerStockPlateSyncResponse {
 #[derive(Serialize)]
 pub struct StockPlateSyncDetail {
     pub stock_code: String,
+    pub stock_name: String,
     pub plate_total: usize,
     pub plate_inserted: usize,
     pub relation_inserted: usize,
