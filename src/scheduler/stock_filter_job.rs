@@ -20,11 +20,14 @@ pub async fn create_stock_filter_jobs(
     db_pool: DbPool,
     ws_sender: crate::utils::ws_broadcast::TaskStatusSender,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // 上午时段 cron 表达式（工作日 1-5）
+    // 上午时段 cron 表达式（工作日 1-5） 
+    // 9:30 - 9:59
+    // 10:00 - 10:59
+    // 11:00 - 11:30
     let morning_crons = vec![
         "0 30-59 9 * * 1-5",   // 9:30-9:59
-        "0 * 10-11 * * 1-5",  // 10:00-11:59
-        "0 0 12 * * 1-5",     // 12:00
+        "0 0-59 10 * * 1-5",  // 10:00-10:59
+        "0 0-30 11 * * 1-5",  // 11:00-11:30
     ];
     
     // 下午时段 cron 表达式（工作日 1-5）
@@ -37,7 +40,7 @@ pub async fn create_stock_filter_jobs(
     for cron_expr in morning_crons {
         let pool = db_pool.clone();
         let sender = ws_sender.clone();
-        
+
         let job = JobBuilder::new()
             .with_timezone(Shanghai)
             .with_cron_job_type()
@@ -59,7 +62,7 @@ pub async fn create_stock_filter_jobs(
     for cron_expr in afternoon_crons {
         let pool = db_pool.clone();
         let sender = ws_sender.clone();
-        
+
         let job = JobBuilder::new()
             .with_timezone(Shanghai)
             .with_cron_job_type()
@@ -76,8 +79,8 @@ pub async fn create_stock_filter_jobs(
         scheduler.add(job).await?;
         tracing::info!("股票筛选下午任务已注册: {} (Asia/Shanghai)", cron_expr);
     }
-    
-    tracing::info!("股票筛选定时任务已全部注册（上午 9:30-12:00，下午 13:00-15:00，每分钟执行）");
+
+    tracing::info!("股票筛选定时任务已全部注册（上午 9:30-11:30，下午 13:00-15:00，每分钟执行）");
     Ok(())
 }
 
