@@ -7,11 +7,11 @@ use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_ENCODING, REFERER, 
 use reqwest::{Client, Url};
 use serde_json::Value;
 use thiserror::Error;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Semaphore;
 
 use crate::api_models::stock::FilteredStockItem;
 use crate::utils::percent::normalize_percent_scalar;
-use crate::utils::proxy::{proxy_get_json, ProxyClient, ProxyError};
+use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyError};
 use crate::utils::secid::code_to_secid;
 
 const EM_LIST_URL: &str = "https://push2.eastmoney.com/api/qt/clist/get";
@@ -61,7 +61,7 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
     let concurrency = params.concurrency.clamp(1, 64);
     let pz = params.pz.clamp(100, 5000);
     let headers = em_headers();
-    let proxy_client = Arc::new(Mutex::new(ProxyClient::from_env()?));
+    let proxy_client = shared_proxy_client()?;
 
     // page 1 for total and first diff
     let first_url = build_list_url(1, pz)?;

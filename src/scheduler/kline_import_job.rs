@@ -1,11 +1,13 @@
-use tokio_cron_scheduler::{JobScheduler, JobBuilder};
+use tokio_cron_scheduler::{JobBuilder, JobScheduler};
 use chrono_tz::Asia::Shanghai;
 use crate::app::DbPool;
 use crate::repositories::stock_snapshot;
 use crate::services::kline_service;
 use crate::utils::http_client;
 use chrono::Local;
-use tokio::time::{sleep, Duration};
+use std::sync::Arc;
+use tokio::sync::Semaphore;
+use tokio::task::JoinSet;
 
 /// K线导入任务执行结果
 #[derive(Debug)]
@@ -22,6 +24,16 @@ pub struct StockImportDetail {
     pub imported_count: usize,
     pub success: bool,
     pub error: Option<String>,
+}
+
+const KLINE_HTTP_CONCURRENCY: usize = 200;
+const KLINE_DB_CONCURRENCY: usize = 200;
+
+#[derive(Debug)]
+enum StockImportOutcome {
+    Success(StockImportDetail),
+    Skipped(StockImportDetail),
+    Failed(StockImportDetail),
 }
 
 pub async fn create_kline_import_job(
@@ -162,7 +174,7 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     // 如果是周末，回溯到上一个交易日（周五）
     let today = get_trading_date();
     
-    // 5. 遍历股票代码，批量导入K线数据
+    // 5. 并发导入K线数据
     let mut success_count = 0;
     let mut failed_count = 0;
     let mut skipped_count = 0;
@@ -172,70 +184,59 @@ pub async fn run_kline_import_task(db_pool: DbPool) -> anyhow::Result<KlineImpor
     let trade_date = chrono::NaiveDate::parse_from_str(&today, "%Y%m%d")
         .map_err(|e| anyhow::anyhow!("日期解析失败: {e}"))?;
     
-    for (index, stock_code) in stock_codes.iter().enumerate() {
-        // 移除前缀（SH/SZ）获取纯数字代码
-        let pure_code = stock_code.trim_start_matches("SH")
-            .trim_start_matches("SZ");
-        
-        // 先检查是否已有当天数据
-        let mut conn = db_pool.get()?;
-        match crate::repositories::daily_kline::exists(&mut conn, pure_code, trade_date) {
-            Ok(true) => {
-                // 已存在，跳过
-                skipped_count += 1;
-                tracing::info!("股票 {} 的 {} 数据已存在，跳过", stock_code, today);
-                stock_details.push(StockImportDetail {
-                    stock_code: stock_code.clone(),
-                    imported_count: 0,
-                    success: true,
-                    error: Some("数据已存在，跳过导入".to_string()),
-                });
-                continue;
-            }
-            Ok(false) => {
-                // 不存在，继续导入
-            }
-            Err(e) => {
-                tracing::warn!("检查股票 {} 数据是否存在时出错: {}", stock_code, e);
-                // 出错时继续尝试导入
-            }
-        }
-        
-        match import_single_stock_kline(
-            &client,
-            pure_code,
-            &today,
-            &db_pool
-        ).await {
-            Ok(imported) => {
-                success_count += 1;
-                tracing::info!("股票 {} 导入成功，导入 {} 条记录", stock_code, imported);
-                stock_details.push(StockImportDetail {
-                    stock_code: stock_code.clone(),
-                    imported_count: imported,
-                    success: true,
-                    error: None,
-                });
-            }
-            Err(e) => {
+    let http_semaphore = Arc::new(Semaphore::new(KLINE_HTTP_CONCURRENCY));
+    let db_semaphore = Arc::new(Semaphore::new(KLINE_DB_CONCURRENCY));
+    let mut join_set = JoinSet::new();
+
+    for stock_code in stock_codes.iter().cloned() {
+        let client = client.clone();
+        let pool = db_pool.clone();
+        let today = today.clone();
+        let http_sem = http_semaphore.clone();
+        let db_sem = db_semaphore.clone();
+        join_set.spawn(async move {
+            process_single_stock_kline(
+                client,
+                stock_code,
+                today,
+                trade_date,
+                pool,
+                http_sem,
+                db_sem,
+            )
+            .await
+        });
+    }
+
+    while let Some(res) = join_set.join_next().await {
+        match res {
+            Ok(outcome) => match outcome {
+                StockImportOutcome::Success(detail) => {
+                    success_count += 1;
+                    tracing::info!(
+                        "股票 {} 导入成功，导入 {} 条记录",
+                        detail.stock_code,
+                        detail.imported_count
+                    );
+                    stock_details.push(detail);
+                }
+                StockImportOutcome::Skipped(detail) => {
+                    skipped_count += 1;
+                    tracing::info!("股票 {} 的 {} 数据已存在，跳过", detail.stock_code, today);
+                    stock_details.push(detail);
+                }
+                StockImportOutcome::Failed(detail) => {
+                    failed_count += 1;
+                    if let Some(ref error_msg) = detail.error {
+                        tracing::error!("股票 {} 导入失败: {}", detail.stock_code, error_msg);
+                    }
+                    stock_details.push(detail);
+                }
+            },
+            Err(join_err) => {
                 failed_count += 1;
-                let error_msg = e.to_string();
-                tracing::error!("股票 {} 导入失败: {}", stock_code, error_msg);
-                stock_details.push(StockImportDetail {
-                    stock_code: stock_code.clone(),
-                    imported_count: 0,
-                    success: false,
-                    error: Some(error_msg),
-                });
+                tracing::error!("K线导入任务并发执行失败: {}", join_err);
             }
-        }
-        
-        // 添加随机延迟，避免频繁请求被封IP（最后一个股票不需要延迟）
-        if index < stock_codes.len() - 1 {
-            // 随机延迟 2-5 秒
-            let delay_ms = rand::random::<u64>() % 3001 + 2000; // 2000-5000ms
-            tracing::debug!("等待 {} 毫秒后处理下一个股票", delay_ms);
-            sleep(Duration::from_millis(delay_ms)).await;
         }
     }
     
@@ -295,6 +296,7 @@ async fn import_single_stock_kline(
     stock_code: &str,
     date: &str,
     db_pool: &DbPool,
+    db_semaphore: Arc<Semaphore>,
 ) -> anyhow::Result<usize> {
     // 1. 从东方财富获取并解析K线数据
     let kline_result = kline_service::fetch_and_parse_kline_data(
@@ -305,6 +307,10 @@ async fn import_single_stock_kline(
     ).await?;
     
     // 2. 获取数据库连接
+    let _db_permit = db_semaphore
+        .acquire_owned()
+        .await
+        .map_err(|_| anyhow::anyhow!("DB 并发限流器已关闭"))?;
     let mut conn = db_pool.get()?;
     
     // 3. 批量插入数据库
@@ -327,6 +333,90 @@ async fn import_single_stock_kline(
     }
     
     Ok(imported_count)
+}
+
+async fn process_single_stock_kline(
+    client: reqwest::Client,
+    stock_code: String,
+    today: String,
+    trade_date: chrono::NaiveDate,
+    db_pool: DbPool,
+    http_semaphore: Arc<Semaphore>,
+    db_semaphore: Arc<Semaphore>,
+) -> StockImportOutcome {
+    let pure_code = stock_code
+        .trim_start_matches("SH")
+        .trim_start_matches("SZ")
+        .to_string();
+
+    let exists = {
+        let _db_permit = match db_semaphore.clone().acquire_owned().await {
+            Ok(permit) => permit,
+            Err(_) => {
+                return StockImportOutcome::Failed(StockImportDetail {
+                    stock_code,
+                    imported_count: 0,
+                    success: false,
+                    error: Some("DB 并发限流器已关闭".to_string()),
+                });
+            }
+        };
+        let mut conn = match db_pool.get() {
+            Ok(conn) => conn,
+            Err(e) => {
+                return StockImportOutcome::Failed(StockImportDetail {
+                    stock_code,
+                    imported_count: 0,
+                    success: false,
+                    error: Some(format!("获取数据库连接失败: {e}")),
+                });
+            }
+        };
+        match crate::repositories::daily_kline::exists(&mut conn, &pure_code, trade_date) {
+            Ok(true) => true,
+            Ok(false) => false,
+            Err(e) => {
+                tracing::warn!("检查股票 {} 数据是否存在时出错: {}", stock_code, e);
+                false
+            }
+        }
+    };
+
+    if exists {
+        return StockImportOutcome::Skipped(StockImportDetail {
+            stock_code,
+            imported_count: 0,
+            success: true,
+            error: Some("数据已存在，跳过导入".to_string()),
+        });
+    }
+
+    let _http_permit = match http_semaphore.acquire_owned().await {
+        Ok(permit) => permit,
+        Err(_) => {
+            return StockImportOutcome::Failed(StockImportDetail {
+                stock_code,
+                imported_count: 0,
+                success: false,
+                error: Some("HTTP 并发限流器已关闭".to_string()),
+            });
+        }
+    };
+
+    match import_single_stock_kline(&client, &pure_code, &today, &db_pool, db_semaphore).await {
+        Ok(imported) => StockImportOutcome::Success(StockImportDetail {
+            stock_code,
+            imported_count: imported,
+            success: true,
+            error: None,
+        }),
+        Err(e) => StockImportOutcome::Failed(StockImportDetail {
+            stock_code,
+            imported_count: 0,
+            success: false,
+            error: Some(e.to_string()),
+        }),
+    }
 }
 
 /// 获取交易日期：如果是周末则返回上周五，否则返回当天
