@@ -1,13 +1,15 @@
 use anyhow::Result;
 use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
-use reqwest::Client;
+use reqwest::header::HeaderMap;
+use reqwest::{Client, Url};
 use serde_json::Value;
 use std::str::FromStr;
 use thiserror::Error;
 
 use crate::models::NewDailyKline;
 use crate::utils::secid::code_to_secid;
+use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyError};
 
 const EM_KLINE_URL: &str = "https://push2his.eastmoney.com/api/qt/stock/kline/get";
 
@@ -15,6 +17,8 @@ const EM_KLINE_URL: &str = "https://push2his.eastmoney.com/api/qt/stock/kline/ge
 pub enum KlineServiceError {
     #[error("http error: {0}")]
     Http(#[from] reqwest::Error),
+    #[error("proxy error: {0}")]
+    Proxy(#[from] ProxyError),
     #[error("serde_json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
     #[error("parse error: {0}")]
@@ -33,7 +37,7 @@ pub struct KlineParseResult {
 }
 
 pub async fn fetch_eastmoney_kline(
-    client: &Client,
+    _client: &Client,
     stock_code: &str,
     beg_date: &str,
     end_date: &str,
@@ -52,9 +56,11 @@ pub async fn fetch_eastmoney_kline(
         "{EM_KLINE_URL}?secid={secid}&ut={ut}&fields1={fields1}&fields2={fields2}&klt={klt}&fqt={fqt}&beg={beg_date}&end={end_date}&smplmt={smplmt}&lmt={lmt}&_={_timestamp}"
     );
 
-    let resp = client.get(&url).send().await?;
-    let body = resp.text().await?;
-    let json: Value = serde_json::from_str(&body)?;
+    let proxy_client = shared_proxy_client()?;
+    let headers = HeaderMap::new();
+    let parsed_url =
+        Url::parse(&url).map_err(|err| KlineServiceError::ParseError(err.to_string()))?;
+    let json = proxy_get_json(&proxy_client, parsed_url, &headers).await?;
     Ok(json)
 }
 
