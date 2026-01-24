@@ -1,10 +1,12 @@
 use std::env;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration as StdDuration;
 
 use chrono::{DateTime, Duration, Local, NaiveDateTime, TimeZone};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, Proxy};
 use serde::Deserialize;
+use tokio::sync::Mutex;
 
 use super::error::{map_error_message, ProxyError};
 
@@ -73,6 +75,8 @@ pub struct ProxyClient {
     timeout: StdDuration,
     cached: Option<CachedProxy>,
 }
+
+static SHARED_PROXY_CLIENT: OnceLock<Arc<Mutex<ProxyClient>>> = OnceLock::new();
 
 impl ProxyClient {
     pub fn new(config: ProxyConfig) -> Self {
@@ -215,6 +219,15 @@ impl ProxyClient {
             .timeout(self.timeout)
             .build()?)
     }
+}
+
+pub fn shared_proxy_client() -> Result<Arc<Mutex<ProxyClient>>, ProxyError> {
+    if let Some(client) = SHARED_PROXY_CLIENT.get() {
+        return Ok(client.clone());
+    }
+    let client = Arc::new(Mutex::new(ProxyClient::from_env()?));
+    let _ = SHARED_PROXY_CLIENT.set(client.clone());
+    Ok(client)
 }
 
 #[derive(Debug, Deserialize)]

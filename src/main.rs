@@ -22,9 +22,16 @@ async fn main() {
     // 构建应用并获取 db_pool
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
     let manager = diesel::r2d2::ConnectionManager::<diesel::pg::PgConnection>::new(database_url);
-    let db_pool = diesel::r2d2::Pool::builder()
-        .build(manager)
-        .expect("Failed to create DB pool");
+    let db_pool_max: u32 = std::env::var("DB_POOL_MAX")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+    let db_pool_min: Option<u32> = std::env::var("DB_POOL_MIN").ok().and_then(|v| v.parse().ok());
+    let mut pool_builder = diesel::r2d2::Pool::builder().max_size(db_pool_max);
+    if let Some(min_idle) = db_pool_min {
+        pool_builder = pool_builder.min_idle(Some(min_idle));
+    }
+    let db_pool = pool_builder.build(manager).expect("Failed to create DB pool");
     
     // 启动定时调度器
     let scheduler = tokio_cron_scheduler::JobScheduler::new().await.expect("创建调度器失败");

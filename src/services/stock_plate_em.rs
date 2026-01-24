@@ -8,7 +8,7 @@ use rand::Rng;
 use std::sync::Arc;
 
 use crate::api_models::stock_plate_em::{EmPlateItem, EmPlateResponse};
-use crate::utils::proxy::{proxy_get_json, ProxyClient, ProxyError};
+use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyClient, ProxyError};
 use crate::utils::secid::code_to_secid;
 
 const EM_PLATE_URL: &str = "https://push2.eastmoney.com/api/qt/slist/get";
@@ -31,7 +31,16 @@ pub async fn fetch_em_plate_list(
     _client: &Client,
     stock_code: &str,
 ) -> Result<EmPlateResponse, EmPlateError> {
-    let _ = _client;
+    let proxy_client = shared_proxy_client()?;
+
+    fetch_em_plate_list_with_proxy_client(proxy_client, _client, stock_code).await
+}
+
+pub async fn fetch_em_plate_list_with_proxy_client(
+    proxy_client: Arc<Mutex<ProxyClient>>,
+    _client: &Client,
+    stock_code: &str,
+) -> Result<EmPlateResponse, EmPlateError> {
     let ut = "fa5fd1943c7b386f172d6893dbfba10b";
     let fields = "f14,f12";
     let secid = code_to_secid(stock_code);
@@ -45,7 +54,6 @@ pub async fn fetch_em_plate_list(
     let wbp2u = "|0|0|0|web";
     let timestamp = chrono::Utc::now().timestamp_millis().to_string();
     let headers = HeaderMap::new();
-    let proxy_client = Arc::new(Mutex::new(ProxyClient::from_env()?));
 
     let mut attempt = 0;
     let max_attempts = 3;
