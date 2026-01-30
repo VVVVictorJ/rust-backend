@@ -141,8 +141,8 @@ pub fn query_tracked_stocks_by_date(
         LEFT JOIN stock_table st ON tds.stock_code = st.stock_code
         LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
         LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
-        WHERE COALESCE(oc.days_3_count, 0) >= $2
-           OR COALESCE(oc.days_7_count, 0) >= $2
+        WHERE COALESCE(oc.days_3_count, 0) >= 2
+           OR COALESCE(oc.days_7_count, 0) >= 2
            OR COALESCE(oc.days_14_count, 0) >= $2
         GROUP BY 
             tds.stock_code,
@@ -213,7 +213,7 @@ pub fn count_tracked_stocks_by_date(
         )
         SELECT COUNT(*) AS count
         FROM occurrence_counts
-        WHERE days_3_count >= $2 OR days_7_count >= $2 OR days_14_count >= $2;
+        WHERE days_3_count >= 2 OR days_7_count >= 2 OR days_14_count >= $2;
     "#;
 
     let result = diesel::sql_query(query)

@@ -15,16 +15,17 @@ use crate::handler::error::AppError;
 use crate::repositories::stock_track_query;
 
 /// 生成追踪标签
-fn generate_tag(days_3: i32, days_7: i32, days_14: i32, min_occurrences: i32) -> String {
+/// 14天≥3次，7天≥2次，3天≥2次
+fn generate_tag(days_3: i32, days_7: i32, days_14: i32, min_occurrences_14: i32) -> String {
     let mut tags = Vec::new();
     
-    if days_14 >= min_occurrences {
+    if days_14 >= min_occurrences_14 {
         tags.push(format!("14天{days_14}次"));
     }
-    if days_7 >= min_occurrences {
+    if days_7 >= 2 {
         tags.push(format!("7天{days_7}次"));
     }
-    if days_3 >= min_occurrences {
+    if days_3 >= 2 {
         tags.push(format!("3天{days_3}次"));
     }
     
