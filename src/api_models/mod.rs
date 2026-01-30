@@ -12,6 +12,7 @@ pub mod stock_plate;
 pub mod stock_table;
 pub mod stock_plate_stock_table;
 pub mod stock_plate_em;
+pub mod stock_track_query;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -43,4 +44,9 @@ pub use stock_plate_stock_table::{
 };
 #[allow(unused_imports)]
 pub use stock_plate_em::{EmPlateItem, EmPlateResponse};
+#[allow(unused_imports)]
+pub use stock_track_query::{
+    TrackQueryRequest, TrackQueryItem, TrackQueryResponse, OccurrenceStats,
+    TrackDetailRequest, TrackDetailItem, TrackDetailResponse,
+};
 

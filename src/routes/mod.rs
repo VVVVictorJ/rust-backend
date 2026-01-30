@@ -11,6 +11,7 @@ mod stock_request_stock;
 mod daily_kline;
 mod scheduler;
 mod stock_trade_date_query;
+mod stock_track_query;
 mod stock_price_compare;
 mod stock_plate;
 mod stock_table;
@@ -25,6 +26,7 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/daily-klines", daily_kline::router())
         .nest("/scheduler", scheduler::router())
         .nest("/stock-trade-date-query", stock_trade_date_query::router())
+        .nest("/stock-track-query", stock_track_query::router())
         .nest("/stock-price-compare", stock_price_compare::router())
         .nest("/stock-plates", stock_plate::router())
         .nest("/stock-tables", stock_table::router())

@@ -272,7 +272,7 @@ pub async fn run_stock_plate_sync_task(db_pool: DbPool) -> anyhow::Result<StockP
                     fatal_error = Some(e);
                 }
                 Err(join_err) => {
-                    fatal_error = Some(anyhow!("板块任务执行失败: {}", join_err));
+                    fatal_error = Some(anyhow!("板块任务执行失败: {join_err}"));
                 }
             }
         }
