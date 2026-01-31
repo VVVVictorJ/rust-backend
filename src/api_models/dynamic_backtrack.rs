@@ -42,3 +42,18 @@ pub struct DynamicBacktrackResponse {
     /// 总记录数
     pub total: i64,
 }
+
+/// 动态回溯明细查询请求
+#[derive(Debug, Deserialize)]
+pub struct DynamicBacktrackDetailRequest {
+    /// 股票代码
+    pub stock_code: String,
+    /// 基准交易日期，格式：YYYY-MM-DD
+    pub trade_date: String,
+    /// 往回多少个交易日（包括当天）
+    pub trade_days: i32,
+}
+
+/// 动态回溯明细查询响应（复用 TrackDetailResponse）
+pub use super::stock_track_query::{TrackDetailItem, TrackDetailResponse};
+

@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{BigInt, Date, Integer, Numeric, Text, Timestamptz, Nullable, Jsonb};
+use diesel::sql_types::{Date, Integer, Numeric, Text, Timestamptz, Nullable, Jsonb};
 use bigdecimal::BigDecimal;
 use serde_json::Value;
 
@@ -125,4 +125,71 @@ pub fn query_dynamic_backtrack(
         .bind::<Integer, _>(trade_days)
         .bind::<Integer, _>(min_occurrences)
         .load::<DynamicBacktrackResult>(conn)
+}
+
+/// 动态回溯明细查询结果结构体（复用 TrackDetailResult）
+pub use super::stock_track_query::TrackDetailResult;
+
+/// 查询某只股票在指定交易日范围内的明细（基于 stock_trading_calendar 表）
+pub fn query_dynamic_backtrack_detail(
+    conn: &mut PgPoolConn,
+    stock_code: &str,
+    trade_date: NaiveDate,
+    trade_days: i32,
+) -> Result<Vec<TrackDetailResult>, diesel::result::Error> {
+    let query = r#"
+        WITH trading_days AS (
+            -- 从 stock_trading_calendar 获取 N 个交易日（包括当天）
+            SELECT trade_date
+            FROM stock_trading_calendar
+            WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
+            ORDER BY trade_date DESC
+            LIMIT $2
+        )
+        SELECT 
+            a.stock_code,
+            a.stock_name,
+            a.latest_price,
+            dk.close_price,
+            a.change_pct,
+            a.volume_ratio,
+            a.turnover_rate,
+            a.bid_ask_ratio,
+            a.main_force_inflow,
+            a.created_at,
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object('plate_code', sp.plate_code, 'name', sp.name))
+                    FILTER (WHERE sp.id IS NOT NULL),
+                '[]'::jsonb
+            ) AS plates                     
+        FROM stock_snapshots a 
+        LEFT JOIN daily_klines dk 
+            ON a.stock_code = dk.stock_code 
+            AND dk.trade_date = (a.created_at AT TIME ZONE 'Asia/Shanghai')::date
+        LEFT JOIN stock_table st ON a.stock_code = st.stock_code
+        LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
+        LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
+        WHERE 
+            a.stock_code = $3
+            AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days)
+        GROUP BY
+            a.stock_code,
+            a.stock_name,
+            a.latest_price,
+            dk.close_price,
+            a.change_pct,
+            a.volume_ratio,
+            a.turnover_rate,
+            a.bid_ask_ratio,
+            a.main_force_inflow,
+            a.created_at
+        ORDER BY a.created_at DESC;
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<Date, _>(trade_date)
+        .bind::<Integer, _>(trade_days)
+        .bind::<Text, _>(stock_code)
+        .load::<TrackDetailResult>(conn)
 }

@@ -53,5 +53,6 @@ pub use stock_track_query::{
 #[allow(unused_imports)]
 pub use dynamic_backtrack::{
     DynamicBacktrackRequest, DynamicBacktrackItem, DynamicBacktrackResponse,
+    DynamicBacktrackDetailRequest,
 };
 
