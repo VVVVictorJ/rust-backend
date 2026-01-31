@@ -10,3 +10,4 @@ pub mod stock_plate;
 pub mod stock_table;
 pub mod stock_plate_stock_table;
 pub mod stock_track_query;
+pub mod dynamic_backtrack;

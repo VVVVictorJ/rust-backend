@@ -13,6 +13,7 @@ pub mod stock_table;
 pub mod stock_plate_stock_table;
 pub mod stock_plate_em;
 pub mod stock_track_query;
+pub mod dynamic_backtrack;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -48,5 +49,9 @@ pub use stock_plate_em::{EmPlateItem, EmPlateResponse};
 pub use stock_track_query::{
     TrackQueryRequest, TrackQueryItem, TrackQueryResponse, OccurrenceStats,
     TrackDetailRequest, TrackDetailItem, TrackDetailResponse,
+};
+#[allow(unused_imports)]
+pub use dynamic_backtrack::{
+    DynamicBacktrackRequest, DynamicBacktrackItem, DynamicBacktrackResponse,
 };
 
