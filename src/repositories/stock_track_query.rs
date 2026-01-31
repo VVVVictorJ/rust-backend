@@ -67,7 +67,7 @@ pub struct TrackDetailResult {
     pub plates: Value,
 }
 
-/// 查询指定交易日的股票快照，并统计每只股票在过去3/7/14天的出现次数
+/// 查询指定交易日的股票快照，并统计每只股票在过去3/7/14个交易日的出现次数
 /// 只返回在任一周期内出现次数 >= min_occurrences 的股票
 pub fn query_tracked_stocks_by_date(
     conn: &mut PgPoolConn,
@@ -75,7 +75,31 @@ pub fn query_tracked_stocks_by_date(
     min_occurrences: i32,
 ) -> Result<Vec<TrackQueryResult>, diesel::result::Error> {
     let query = r#"
-        WITH target_date_stocks AS (
+        WITH trading_days_3 AS (
+            -- 获取过去3个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 3
+        ),
+        trading_days_7 AS (
+            -- 获取过去7个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 7
+        ),
+        trading_days_14 AS (
+            -- 获取过去14个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 14
+        ),
+        target_date_stocks AS (
             -- 查询指定日期的股票快照（去重取每只股票最新的一条）
             SELECT DISTINCT ON (stock_code)
                 stock_code,
@@ -92,28 +116,24 @@ pub fn query_tracked_stocks_by_date(
             ORDER BY stock_code, created_at DESC
         ),
         occurrence_counts AS (
-            -- 统计每只股票在过去N天的出现天数
+            -- 统计每只股票在过去N个交易日的出现天数（包括当天）
             SELECT 
                 tds.stock_code,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '3 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_3)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_3_count,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '7 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_7)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_7_count,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '14 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_14)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_14_count
             FROM target_date_stocks tds
             LEFT JOIN stock_snapshots ss ON tds.stock_code = ss.stock_code
-                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '14 days'
-                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_14)
             GROUP BY tds.stock_code
         )
         SELECT 
@@ -182,7 +202,31 @@ pub fn count_tracked_stocks_by_date(
     }
 
     let query = r#"
-        WITH target_date_stocks AS (
+        WITH trading_days_3 AS (
+            -- 获取过去3个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 3
+        ),
+        trading_days_7 AS (
+            -- 获取过去7个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 7
+        ),
+        trading_days_14 AS (
+            -- 获取过去14个交易日（包括当天）
+            SELECT DISTINCT trade_date
+            FROM daily_klines
+            WHERE trade_date <= $1::date
+            ORDER BY trade_date DESC
+            LIMIT 14
+        ),
+        target_date_stocks AS (
             SELECT DISTINCT stock_code
             FROM stock_snapshots
             WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::date = $1::date
@@ -191,24 +235,20 @@ pub fn count_tracked_stocks_by_date(
             SELECT 
                 tds.stock_code,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '3 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_3)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_3_count,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '7 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_7)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_7_count,
                 COUNT(DISTINCT CASE 
-                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '14 days'
-                         AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                    WHEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_14)
                     THEN (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date 
                 END)::integer AS days_14_count
             FROM target_date_stocks tds
             LEFT JOIN stock_snapshots ss ON tds.stock_code = ss.stock_code
-                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date >= $1::date - INTERVAL '14 days'
-                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date < $1::date
+                AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days_14)
             GROUP BY tds.stock_code
         )
         SELECT COUNT(*) AS count
