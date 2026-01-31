@@ -172,7 +172,10 @@ pub fn query_dynamic_backtrack_detail(
         LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
         WHERE 
             a.stock_code = $3
-            AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days)
+            AND (
+                (a.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days)
+                OR (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = $1::date
+            )
         GROUP BY
             a.stock_code,
             a.stock_name,
