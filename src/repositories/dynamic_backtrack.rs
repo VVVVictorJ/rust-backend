@@ -46,10 +46,10 @@ pub fn query_dynamic_backtrack(
 ) -> Result<Vec<DynamicBacktrackResult>, diesel::result::Error> {
     let query = r#"
         WITH trading_days AS (
-            -- 从 stock_trading_calendar 获取 N 个交易日（包括当天）
+            -- 从 stock_trading_calendar 获取 N 个交易日（不包括当天）
             SELECT trade_date
             FROM stock_trading_calendar
-            WHERE trade_date <= $1::date
+            WHERE trade_date < $1::date
               AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT $2
@@ -139,10 +139,10 @@ pub fn query_dynamic_backtrack_detail(
 ) -> Result<Vec<TrackDetailResult>, diesel::result::Error> {
     let query = r#"
         WITH trading_days AS (
-            -- 从 stock_trading_calendar 获取 N 个交易日（包括当天）
+            -- 从 stock_trading_calendar 获取 N 个交易日（不包括当天）
             SELECT trade_date
             FROM stock_trading_calendar
-            WHERE trade_date <= $1::date
+            WHERE trade_date < $1::date
               AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT $2
