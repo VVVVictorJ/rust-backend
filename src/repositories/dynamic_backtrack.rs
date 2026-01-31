@@ -71,15 +71,15 @@ pub fn query_dynamic_backtrack(
             ORDER BY stock_code, created_at DESC
         ),
         occurrence_counts AS (
-            -- 统计每只股票在这些交易日的出现天数
+            -- 统计每只股票的总出现次数：当天1次 + 前面N天的出现次数
             SELECT 
                 tds.stock_code,
-                COUNT(DISTINCT (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date)::integer AS occurrence_count
+                (1 + COUNT(DISTINCT (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date))::integer AS occurrence_count
             FROM target_date_stocks tds
             LEFT JOIN stock_snapshots ss ON tds.stock_code = ss.stock_code
                 AND (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date IN (SELECT trade_date FROM trading_days)
             GROUP BY tds.stock_code
-            HAVING COUNT(DISTINCT (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date) >= $3
+            HAVING (1 + COUNT(DISTINCT (ss.created_at AT TIME ZONE 'Asia/Shanghai')::date)) >= $3
         )
         SELECT 
             tds.stock_code,
