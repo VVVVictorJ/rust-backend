@@ -77,25 +77,28 @@ pub fn query_tracked_stocks_by_date(
     let query = r#"
         WITH trading_days_3 AS (
             -- 获取过去3个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 3
         ),
         trading_days_7 AS (
             -- 获取过去7个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 7
         ),
         trading_days_14 AS (
             -- 获取过去14个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 14
         ),
@@ -204,25 +207,28 @@ pub fn count_tracked_stocks_by_date(
     let query = r#"
         WITH trading_days_3 AS (
             -- 获取过去3个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 3
         ),
         trading_days_7 AS (
             -- 获取过去7个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 7
         ),
         trading_days_14 AS (
             -- 获取过去14个交易日（包括当天）
-            SELECT DISTINCT trade_date
-            FROM daily_klines
+            SELECT trade_date
+            FROM stock_trading_calendar
             WHERE trade_date <= $1::date
+              AND is_holiday = FALSE
             ORDER BY trade_date DESC
             LIMIT 14
         ),
