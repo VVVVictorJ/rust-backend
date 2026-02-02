@@ -103,6 +103,16 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    stock_watchlist (id) {
+        id -> Int4,
+        stock_code -> Varchar,
+        stock_name -> Nullable<Varchar>,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
@@ -119,5 +129,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     daily_klines,
     profit_analysis,
     job_execution_history,
+    stock_watchlist,
 );
 
