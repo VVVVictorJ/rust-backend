@@ -215,24 +215,48 @@ pub async fn query_stock_kline(
 /// 补齐观察表K线数据
 pub async fn fill_watchlist_klines(
     State(state): State<AppState>,
-    Json(_payload): Json<WatchlistFillKlineRequest>,
+    Json(payload): Json<WatchlistFillKlineRequest>,
 ) -> Result<Json<WatchlistFillKlineResponse>, AppError> {
-    // 1. 获取所有观察表中的股票
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| AppError::InternalServerError)?;
-    
-    let watchlist_items = stock_watchlist::list_all(&mut conn)
-        .map_err(|e| {
-            tracing::error!("Failed to list watchlist stocks: {}", e);
-            AppError::InternalServerError
-        })?;
-    
-    let stock_codes: Vec<String> = watchlist_items
-        .into_iter()
-        .map(|item| item.stock_code)
-        .collect();
+    // 1. 获取要补齐的股票列表
+    let stock_codes: Vec<String> = if let Some(codes) = payload.stock_codes {
+        if codes.is_empty() {
+            // 如果传入空列表，补齐所有观察表中的股票
+            let mut conn = state
+                .db_pool
+                .get()
+                .map_err(|_| AppError::InternalServerError)?;
+            
+            let watchlist_items = stock_watchlist::list_all(&mut conn)
+                .map_err(|e| {
+                    tracing::error!("Failed to list watchlist stocks: {}", e);
+                    AppError::InternalServerError
+                })?;
+            
+            watchlist_items
+                .into_iter()
+                .map(|item| item.stock_code)
+                .collect()
+        } else {
+            codes
+        }
+    } else {
+        // 如果没有指定股票代码，补齐所有观察表中的股票
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
+        
+        let watchlist_items = stock_watchlist::list_all(&mut conn)
+            .map_err(|e| {
+                tracing::error!("Failed to list watchlist stocks: {}", e);
+                AppError::InternalServerError
+            })?;
+        
+        watchlist_items
+            .into_iter()
+            .map(|item| item.stock_code)
+            .collect()
+    };
     
     if stock_codes.is_empty() {
         return Ok(Json(WatchlistFillKlineResponse {

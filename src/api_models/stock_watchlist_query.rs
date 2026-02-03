@@ -127,7 +127,9 @@ pub struct WatchlistKlineResponse {
 /// 补齐观察表K线数据请求
 #[derive(Debug, Deserialize)]
 pub struct WatchlistFillKlineRequest {
-    // 可以为空，表示补齐所有观察表中的股票
+    /// 股票代码列表（可选），如果为空则补齐所有观察表中的股票
+    #[serde(default)]
+    pub stock_codes: Option<Vec<String>>,
 }
 
 /// 补齐观察表K线数据响应
