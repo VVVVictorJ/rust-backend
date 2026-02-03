@@ -58,6 +58,10 @@ async fn main() {
     if let Err(e) = scheduler::stock_plate_sync_job::create_stock_plate_sync_job(&scheduler, db_pool.clone(), ws_sender.clone()).await {
         tracing::error!("创建 stock_plate 同步定时任务失败: {}", e);
     }
+
+    if let Err(e) = scheduler::watchlist_kline_job::create_watchlist_kline_job(&scheduler, db_pool.clone(), ws_sender.clone()).await {
+        tracing::error!("创建观察表K线导入定时任务失败: {}", e);
+    }
     
     scheduler.start().await.expect("启动调度器失败");
     tracing::info!("定时任务调度器已启动");

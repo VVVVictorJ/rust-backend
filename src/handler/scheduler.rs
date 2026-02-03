@@ -12,6 +12,7 @@ use crate::handler::error::AppError;
 use crate::repositories::job_execution_history;
 use crate::scheduler::{
     kline_import_job, profit_analysis_job, stock_filter_job, stock_plate_sync_job, stock_table_sync_job,
+    watchlist_kline_job,
 };
 
 #[derive(Serialize)]
@@ -391,6 +392,70 @@ pub async fn trigger_stock_plate_sync(
     }))
 }
 
+/// 手动触发观察表K线导入任务
+pub async fn trigger_watchlist_kline_import(
+    State(state): State<AppState>,
+) -> Result<Json<TriggerTaskResponse>, AppError> {
+    tracing::info!("收到手动触发观察表K线导入任务的请求");
+    
+    // 广播任务开始
+    crate::utils::ws_broadcast::broadcast_task_status(
+        &state.ws_sender,
+        "watchlist_kline_import".to_string(),
+        "running".to_string(),
+    );
+    
+    // 调用定时任务的核心逻辑
+    match watchlist_kline_job::run_watchlist_kline_task(state.db_pool.clone()).await {
+        Ok(result) => {
+            // 广播任务完成
+            let status = if result.failed_count == 0 {
+                "success"
+            } else if result.success_count > 0 {
+                "partial"
+            } else {
+                "failed"
+            };
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "watchlist_kline_import".to_string(),
+                status.to_string(),
+            );
+            
+            let details = result.stock_details.into_iter()
+                .map(|d| StockDetail {
+                    stock_code: d.stock_code,
+                    imported_count: d.imported_count,
+                    success: d.success,
+                    error: d.error,
+                })
+                .collect();
+            
+            Ok(Json(TriggerTaskResponse {
+                success: result.failed_count == 0,
+                message: format!(
+                    "观察表K线导入任务执行完成，总计 {} 只股票，成功 {} 只，失败 {} 只，跳过 {} 只",
+                    result.total_stocks, result.success_count, result.failed_count, result.skipped_count
+                ),
+                total_stocks: result.total_stocks,
+                success_count: result.success_count,
+                failed_count: result.failed_count,
+                details,
+            }))
+        }
+        Err(e) => {
+            tracing::error!("手动触发观察表K线导入任务失败: {}", e);
+            // 广播任务失败
+            crate::utils::ws_broadcast::broadcast_task_status(
+                &state.ws_sender,
+                "watchlist_kline_import".to_string(),
+                "failed".to_string(),
+            );
+            Err(AppError::InternalServerError)
+        }
+    }
+}
+
 /// 获取任务列表
 pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
     let jobs = vec![
@@ -420,7 +485,7 @@ pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
             display_name: "盈利分析".to_string(),
             description: "分析股票快照的盈利情况".to_string(),
             schedule: "每天 15:40".to_string(),
-            enabled: true,
+            enabled: false,
         },
         JobInfo {
             name: "stock_filter_morning".to_string(),
@@ -434,6 +499,13 @@ pub async fn get_job_list() -> Result<Json<Vec<JobInfo>>, AppError> {
             display_name: "股票筛选(下午)".to_string(),
             description: "交易时段自动筛选符合条件的股票并入库".to_string(),
             schedule: "工作日 13:00-15:00 每分钟".to_string(),
+            enabled: true,
+        },
+        JobInfo {
+            name: "watchlist_kline_import".to_string(),
+            display_name: "观察表K线导入".to_string(),
+            description: "对观察表中的股票进行K线数据检查和导入".to_string(),
+            schedule: "每天 16:00".to_string(),
             enabled: true,
         },
     ];
