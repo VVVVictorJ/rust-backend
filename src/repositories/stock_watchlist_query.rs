@@ -83,6 +83,7 @@ pub struct WatchlistKlineResult {
 }
 
 /// 查询观察表中的股票，支持板块和区间筛选
+#[allow(clippy::too_many_arguments)]
 pub fn query_watchlist_stocks(
     conn: &mut PgPoolConn,
     plate_codes: &[String],
@@ -109,40 +110,40 @@ pub fn query_watchlist_stocks(
 
     // 区间筛选
     if let Some(v) = change_pct_min {
-        where_conditions.push(format!("ls.change_pct >= {}", v));
+        where_conditions.push(format!("ls.change_pct >= {v}"));
     }
     if let Some(v) = change_pct_max {
-        where_conditions.push(format!("ls.change_pct <= {}", v));
+        where_conditions.push(format!("ls.change_pct <= {v}"));
     }
     if let Some(v) = volume_ratio_min {
-        where_conditions.push(format!("ls.volume_ratio >= {}", v));
+        where_conditions.push(format!("ls.volume_ratio >= {v}"));
     }
     if let Some(v) = volume_ratio_max {
-        where_conditions.push(format!("ls.volume_ratio <= {}", v));
+        where_conditions.push(format!("ls.volume_ratio <= {v}"));
     }
     if let Some(v) = turnover_rate_min {
-        where_conditions.push(format!("ls.turnover_rate >= {}", v));
+        where_conditions.push(format!("ls.turnover_rate >= {v}"));
     }
     if let Some(v) = turnover_rate_max {
-        where_conditions.push(format!("ls.turnover_rate <= {}", v));
+        where_conditions.push(format!("ls.turnover_rate <= {v}"));
     }
     if let Some(v) = bid_ask_ratio_min {
-        where_conditions.push(format!("ls.bid_ask_ratio >= {}", v));
+        where_conditions.push(format!("ls.bid_ask_ratio >= {v}"));
     }
     if let Some(v) = bid_ask_ratio_max {
-        where_conditions.push(format!("ls.bid_ask_ratio <= {}", v));
+        where_conditions.push(format!("ls.bid_ask_ratio <= {v}"));
     }
     if let Some(v) = main_force_inflow_min {
-        where_conditions.push(format!("ls.main_force_inflow >= {}", v));
+        where_conditions.push(format!("ls.main_force_inflow >= {v}"));
     }
     if let Some(v) = main_force_inflow_max {
-        where_conditions.push(format!("ls.main_force_inflow <= {}", v));
+        where_conditions.push(format!("ls.main_force_inflow <= {v}"));
     }
 
     // 股票代码模糊匹配
     if let Some(filter) = stock_code_filter {
         let escaped = filter.replace("'", "''").replace("%", "\\%").replace("_", "\\_");
-        where_conditions.push(format!("ls.stock_code LIKE '%{}%'", escaped));
+        where_conditions.push(format!("ls.stock_code LIKE '%{escaped}%'"));
     }
 
     let where_clause = if where_conditions.is_empty() {
@@ -192,7 +193,7 @@ pub fn query_watchlist_stocks(
         LEFT JOIN stock_table st ON ls.stock_code = st.stock_code
         LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
         LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
-        {}
+        {where_clause}
         GROUP BY
             ls.stock_code,
             ls.stock_name,
@@ -205,8 +206,7 @@ pub fn query_watchlist_stocks(
             ls.main_force_inflow,
             ls.created_at
         ORDER BY ls.main_force_inflow DESC;
-        "#,
-        where_clause
+        "#
     );
 
     diesel::sql_query(query).load::<WatchlistQueryResult>(conn)

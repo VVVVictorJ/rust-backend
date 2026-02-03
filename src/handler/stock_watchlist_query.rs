@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     Json,
 };
-use chrono::{NaiveDate, Utc};
+use chrono::Utc;
 use serde_json;
 
 use crate::api_models::stock_trade_date_query::PlateInfo;
