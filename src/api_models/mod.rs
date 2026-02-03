@@ -15,6 +15,7 @@ pub mod stock_plate_em;
 pub mod stock_track_query;
 pub mod dynamic_backtrack;
 pub mod stock_watchlist;
+pub mod stock_watchlist_query;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -60,5 +61,11 @@ pub use dynamic_backtrack::{
 pub use stock_watchlist::{
     AddWatchlistRequest, WatchlistResponse, CheckWatchlistResponse,
     BatchCheckWatchlistRequest, BatchCheckWatchlistResponse,
+};
+#[allow(unused_imports)]
+pub use stock_watchlist_query::{
+    WatchlistQueryRequest, WatchlistQueryItem, WatchlistQueryResponse,
+    WatchlistDetailRequest, WatchlistDetailItem, WatchlistDetailResponse,
+    WatchlistKlineRequest, WatchlistKlineItem, WatchlistKlineResponse,
 };
 
