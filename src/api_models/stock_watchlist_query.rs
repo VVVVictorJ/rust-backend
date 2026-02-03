@@ -123,3 +123,37 @@ pub struct WatchlistKlineResponse {
     /// 结束日期（当前日期）
     pub end_date: NaiveDate,
 }
+
+/// 补齐观察表K线数据请求
+#[derive(Debug, Deserialize)]
+pub struct WatchlistFillKlineRequest {
+    // 可以为空，表示补齐所有观察表中的股票
+}
+
+/// 补齐观察表K线数据响应
+#[derive(Debug, Serialize)]
+pub struct WatchlistFillKlineResponse {
+    /// 总股票数
+    pub total_stocks: usize,
+    /// 成功数
+    pub success_count: usize,
+    /// 失败数
+    pub failed_count: usize,
+    /// 跳过数（无快照数据或无需补齐）
+    pub skipped_count: usize,
+    /// 股票详情
+    pub stock_details: Vec<StockFillKlineDetail>,
+}
+
+/// 股票补齐K线数据详情
+#[derive(Debug, Serialize)]
+pub struct StockFillKlineDetail {
+    /// 股票代码
+    pub stock_code: String,
+    /// 导入的K线数据条数
+    pub imported_count: usize,
+    /// 是否成功
+    pub success: bool,
+    /// 错误信息（如果有）
+    pub error: Option<String>,
+}

@@ -314,3 +314,68 @@ pub fn query_stock_kline_range(
         .bind::<Date, _>(end_date)
         .load::<WatchlistKlineResult>(conn)
 }
+
+/// 查询股票在 stock_snapshots 中的日期范围
+pub fn find_snapshot_date_range(
+    conn: &mut PgPoolConn,
+    stock_code: &str,
+) -> Result<Option<(NaiveDate, NaiveDate)>, diesel::result::Error> {
+    #[derive(QueryableByName)]
+    struct DateRangeResult {
+        #[diesel(sql_type = Nullable<Date>)]
+        min_date: Option<NaiveDate>,
+        #[diesel(sql_type = Nullable<Date>)]
+        max_date: Option<NaiveDate>,
+    }
+
+    let query = r#"
+        SELECT 
+            MIN((created_at AT TIME ZONE 'Asia/Shanghai')::date) AS min_date,
+            MAX((created_at AT TIME ZONE 'Asia/Shanghai')::date) AS max_date
+        FROM stock_snapshots
+        WHERE stock_code = $1;
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<Text, _>(stock_code)
+        .get_result::<DateRangeResult>(conn)
+        .optional()
+        .map(|opt| {
+            opt.and_then(|r| {
+                match (r.min_date, r.max_date) {
+                    (Some(min), Some(max)) => Some((min, max)),
+                    _ => None,
+                }
+            })
+        })
+}
+
+/// 查询指定股票在日期范围内已存在的 K 线日期
+pub fn find_existing_kline_dates(
+    conn: &mut PgPoolConn,
+    stock_code: &str,
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+) -> Result<Vec<NaiveDate>, diesel::result::Error> {
+    #[derive(QueryableByName)]
+    struct DateResult {
+        #[diesel(sql_type = Date)]
+        trade_date: NaiveDate,
+    }
+
+    let query = r#"
+        SELECT trade_date
+        FROM daily_klines
+        WHERE stock_code = $1
+          AND trade_date >= $2
+          AND trade_date <= $3
+        ORDER BY trade_date ASC;
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<Text, _>(stock_code)
+        .bind::<Date, _>(start_date)
+        .bind::<Date, _>(end_date)
+        .load::<DateResult>(conn)
+        .map(|results| results.into_iter().map(|r| r.trade_date).collect())
+}
