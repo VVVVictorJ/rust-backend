@@ -316,6 +316,7 @@ pub fn query_stock_kline_range(
 }
 
 /// 查询股票在 stock_snapshots 中的日期范围
+#[allow(dead_code)]
 pub fn find_snapshot_date_range(
     conn: &mut PgPoolConn,
     stock_code: &str,

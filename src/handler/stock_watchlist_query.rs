@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     Json,
 };
-use chrono::{Utc, NaiveDate};
+use chrono::{Utc, NaiveDate, FixedOffset};
 use serde_json;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -347,8 +347,8 @@ async fn fill_single_stock_klines(
     http_semaphore: Arc<Semaphore>,
     db_semaphore: Arc<Semaphore>,
 ) -> StockFillOutcome {
-    // 1. 查询 stock_snapshots 中的日期范围
-    let date_range = {
+    // 1. 查询股票在 stock_snapshots 中首次出现的日期
+    let start_date = {
         let _db_permit = match db_semaphore.clone().acquire_owned().await {
             Ok(permit) => permit,
             Err(_) => {
@@ -372,8 +372,8 @@ async fn fill_single_stock_klines(
             }
         };
         
-        match stock_watchlist_query::find_snapshot_date_range(&mut conn, &stock_code) {
-            Ok(Some(range)) => Some(range),
+        match stock_watchlist_query::find_first_occurrence_date(&mut conn, &stock_code) {
+            Ok(Some(date)) => date,
             Ok(None) => {
                 // 没有快照数据，跳过
                 return StockFillOutcome::Skipped(StockFillKlineDetail {
@@ -384,28 +384,21 @@ async fn fill_single_stock_klines(
                 });
             }
             Err(e) => {
-                tracing::error!("Failed to query date range for {}: {}", stock_code, e);
+                tracing::error!("Failed to query first occurrence date for {}: {}", stock_code, e);
                 return StockFillOutcome::Failed(StockFillKlineDetail {
                     stock_code: stock_code.clone(),
                     imported_count: 0,
                     success: false,
-                    error: Some(format!("Failed to query date range: {e}")),
+                    error: Some(format!("Failed to query first occurrence date: {e}")),
                 });
             }
         }
     };
     
-    let (start_date, end_date) = match date_range {
-        Some(range) => range,
-        None => {
-            return StockFillOutcome::Skipped(StockFillKlineDetail {
-                stock_code: stock_code.clone(),
-                imported_count: 0,
-                success: true,
-                error: Some("No date range found".to_string()),
-            });
-        }
-    };
+    // 2. 获取当前时间（UTC+8）
+    let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
+    let now_utc8 = Utc::now().with_timezone(&utc_plus_8);
+    let end_date = now_utc8.date_naive();
     
     // 2. 查询已存在的K线日期
     let existing_dates = {
@@ -443,29 +436,11 @@ async fn fill_single_stock_klines(
     
     let existing_dates_set: std::collections::HashSet<NaiveDate> = existing_dates.into_iter().collect();
     
-    // 3. 计算需要补齐的日期范围（生成所有日期，排除已存在的）
-    let mut dates_to_fill = Vec::new();
-    let mut current_date = start_date;
-    while current_date <= end_date {
-        if !existing_dates_set.contains(&current_date) {
-            dates_to_fill.push(current_date);
-        }
-        current_date = match current_date.succ_opt() {
-            Some(date) => date,
-            None => break,
-        };
-    }
+    // 3. 检查是否所有日期都已存在（如果范围很大，只检查开始和结束日期）
+    // 注意：这里不生成所有日期列表，因为东方财富API支持日期范围查询
+    // 我们直接查询整个范围，然后在插入时跳过已存在的日期
     
-    if dates_to_fill.is_empty() {
-        return StockFillOutcome::Skipped(StockFillKlineDetail {
-            stock_code: stock_code.clone(),
-            imported_count: 0,
-            success: true,
-            error: Some("All dates already exist".to_string()),
-        });
-    }
-    
-    // 4. 按日期范围批量获取K线数据（东方财富API支持日期范围查询）
+    // 4. 按日期范围批量获取K线数据（从首次出现日期到当前时间UTC+8）
     let start_date_str = start_date.format("%Y%m%d").to_string();
     let end_date_str = end_date.format("%Y%m%d").to_string();
     
@@ -499,7 +474,7 @@ async fn fill_single_stock_klines(
         }
     };
     
-    // 6. 过滤出需要插入的数据（排除已存在的日期）
+    // 4. 过滤出需要插入的数据（排除已存在的日期）
     let klines_to_insert: Vec<_> = kline_result.parsed
         .into_iter()
         .filter(|kline| !existing_dates_set.contains(&kline.trade_date))
@@ -514,7 +489,7 @@ async fn fill_single_stock_klines(
         });
     }
     
-    // 7. 批量插入数据库
+    // 5. 批量插入数据库
     let mut imported_count = 0;
     let mut last_error = None;
     
