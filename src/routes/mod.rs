@@ -19,6 +19,7 @@ mod stock_plate_stock_table;
 mod dynamic_backtrack;
 mod stock_watchlist;
 mod stock_watchlist_query;
+mod ai_analysis;
 
 pub fn build_routes() -> Router<AppState> {
     let api_router = Router::new()
@@ -36,7 +37,8 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/stock-plate-stocks", stock_plate_stock_table::router())
         .nest("/stock-dynamic-backtrack", dynamic_backtrack::router())
         .nest("/stock-watchlist", stock_watchlist::router())
-        .nest("/stock-watchlist-query", stock_watchlist_query::router());
+        .nest("/stock-watchlist-query", stock_watchlist_query::router())
+        .nest("/ai-analysis", ai_analysis::router());
 
     Router::new()
         // 根路径与健康检查

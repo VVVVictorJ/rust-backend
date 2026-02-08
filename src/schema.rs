@@ -113,6 +113,37 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    ai_trend_analysis (id) {
+        id -> Int4,
+        stock_code -> Varchar,
+        stock_name -> Nullable<Varchar>,
+        model_name -> Varchar,
+        status -> Varchar,
+        request_payload -> Jsonb,
+        response_json -> Nullable<Jsonb>,
+        raw_response -> Nullable<Text>,
+        signal_count -> Nullable<Int4>,
+        kline_start_date -> Nullable<Date>,
+        kline_end_date -> Nullable<Date>,
+        error_message -> Nullable<Text>,
+        duration_ms -> Nullable<Int8>,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
+    stock_trading_calendar (id) {
+        id -> Int4,
+        trade_date -> Date,
+        is_holiday -> Bool,
+        holiday_name -> Nullable<Varchar>,
+        created_at -> Nullable<Timestamp>,
+        updated_at -> Nullable<Timestamp>,
+    }
+}
+
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
@@ -130,5 +161,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     profit_analysis,
     job_execution_history,
     stock_watchlist,
+    ai_trend_analysis,
+    stock_trading_calendar,
 );
 

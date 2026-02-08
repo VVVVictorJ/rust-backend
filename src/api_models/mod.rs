@@ -16,6 +16,7 @@ pub mod stock_track_query;
 pub mod dynamic_backtrack;
 pub mod stock_watchlist;
 pub mod stock_watchlist_query;
+pub mod ai_analysis;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -67,5 +68,11 @@ pub use stock_watchlist_query::{
     WatchlistQueryRequest, WatchlistQueryItem, WatchlistQueryResponse,
     WatchlistDetailRequest, WatchlistDetailItem, WatchlistDetailResponse,
     WatchlistKlineRequest, WatchlistKlineItem, WatchlistKlineResponse,
+};
+#[allow(unused_imports)]
+pub use ai_analysis::{
+    TrendPredictionRequest, TrendPredictionResponse,
+    TrendHistoryRequest, TrendHistoryItem, TrendHistoryResponse,
+    TrendDetailResponse,
 };
 

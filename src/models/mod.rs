@@ -8,6 +8,7 @@ pub mod stock_plates;
 pub mod stock_tables;
 pub mod stock_plate_stock_tables;
 pub mod stock_watchlist;
+pub mod ai_trend_analysis;
 
 pub use stock_requests::{StockRequest, NewStockRequest};
 pub use stock_request_stocks::{StockRequestStock, NewStockRequestStock};
@@ -20,3 +21,4 @@ pub use stock_tables::{StockTable, NewStockTable, UpdateStockTable};
 #[allow(unused_imports)]
 pub use stock_plate_stock_tables::{StockPlateStockTable, NewStockPlateStockTable};
 pub use stock_watchlist::{StockWatchlist, NewStockWatchlist, UpdateStockWatchlist};
+pub use ai_trend_analysis::{AiTrendAnalysis, NewAiTrendAnalysis, UpdateAiTrendAnalysis};

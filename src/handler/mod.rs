@@ -18,3 +18,4 @@ pub mod stock_track_query;
 pub mod dynamic_backtrack;
 pub mod stock_watchlist;
 pub mod stock_watchlist_query;
+pub mod ai_analysis;
