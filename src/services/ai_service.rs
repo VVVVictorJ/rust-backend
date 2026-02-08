@@ -62,7 +62,7 @@ pub struct AiAnalysisResult {
 /// 创建用于调用 Qwen API 的 HTTP 客户端（不需要代理）
 pub fn create_ai_client() -> Result<Client, reqwest::Error> {
     Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .timeout(std::time::Duration::from_secs(180))
         .build()
 }
 
