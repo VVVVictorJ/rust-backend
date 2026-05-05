@@ -9,6 +9,7 @@ on:
 env:
   REGISTRY: docker.io
   BACKEND_IMAGE: vic777/rust-backend
+  REPO_URL: https://github.com/${{ github.repository }}.git
 
 jobs:
   build-and-push:
@@ -151,7 +152,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
-          envs: BACKEND_IMAGE
+          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA
           script: |
             set -euxo pipefail
             TARGET_DIGEST="${{ needs.build-and-push.outputs.deploy_digest }}"
@@ -200,8 +201,27 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
             # 拉取并固定到本次构建 digest，避免 latest 标签漂移或缓存不一致
-            docker pull "${TARGET_REF}"
-            docker tag "${TARGET_REF}" "${BACKEND_IMAGE}:latest"
+            pulled=0
+            for attempt in 1 2 3 4 5; do
+              echo "=== backend deploy debug: digest pull attempt ${attempt} ==="
+              if docker pull "${TARGET_REF}"; then
+                pulled=1
+                break
+              fi
+            done
+
+            if [ "${pulled}" -ne 1 ]; then
+              echo "=== backend deploy debug: digest pull failed, fallback to local build ==="
+              BUILD_DIR="/tmp/rust-backend-${GITHUB_SHA}"
+              rm -rf "${BUILD_DIR}"
+              git clone "${REPO_URL}" "${BUILD_DIR}"
+              cd "${BUILD_DIR}"
+              git checkout "${GITHUB_SHA}"
+              docker build --platform linux/amd64 -t "${BACKEND_IMAGE}:latest" .
+              cd "${{ secrets.DEPLOY_PATH }}"
+            else
+              docker tag "${TARGET_REF}" "${BACKEND_IMAGE}:latest"
+            fi
             echo "=== backend deploy debug: backend image after pull ==="
             docker image inspect vic777/rust-backend:latest --format '{{.Id}} {{index .RepoDigests 0}}' || true
             # 强制移除旧容器，确保新镜像生效
