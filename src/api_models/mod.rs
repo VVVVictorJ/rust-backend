@@ -17,6 +17,7 @@ pub mod dynamic_backtrack;
 pub mod stock_watchlist;
 pub mod stock_watchlist_query;
 pub mod ai_analysis;
+pub mod convertible_bond_query;
 
 #[allow(unused_imports)]
 pub use stock_request::{StockRequestResponse, CreateStockRequest};
@@ -75,4 +76,6 @@ pub use ai_analysis::{
     TrendHistoryRequest, TrendHistoryItem, TrendHistoryResponse,
     TrendDetailResponse,
 };
+#[allow(unused_imports)]
+pub use convertible_bond_query::{ConvertibleBondItem, ConvertibleBondQueryResponse};
 
