@@ -13,6 +13,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      deploy_digest: ${{ steps.deploy_digest.outputs.value }}
     permissions:
       contents: read
     steps:
@@ -152,7 +154,12 @@ jobs:
           envs: BACKEND_IMAGE
           script: |
             set -euxo pipefail
-            TARGET_REF="${BACKEND_IMAGE}@${{ steps.deploy_digest.outputs.value }}"
+            TARGET_DIGEST="${{ needs.build-and-push.outputs.deploy_digest }}"
+            if [ -z "${TARGET_DIGEST}" ]; then
+              echo "ERROR: deploy digest is empty, cannot deploy backend image safely" >&2
+              exit 1
+            fi
+            TARGET_REF="${BACKEND_IMAGE}@${TARGET_DIGEST}"
             # #region agent log
             echo "=== backend deploy debug: host info ==="
             hostname
