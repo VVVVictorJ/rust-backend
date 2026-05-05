@@ -110,6 +110,23 @@ jobs:
           echo "ROOT_DIGEST=${{ steps.build_root.outputs.digest }}"
           # #endregion
 
+      - name: Resolve deploy digest
+        if: ${{ steps.cred.outputs.has == 'true' }}
+        id: deploy_digest
+        run: |
+          DIGEST="${{ steps.build_subdir.outputs.digest }}"
+          if [ -z "$DIGEST" ]; then
+            DIGEST="${{ steps.build_root.outputs.digest }}"
+          fi
+          if [ -z "$DIGEST" ]; then
+            echo "Cannot resolve backend image digest" >&2
+            exit 1
+          fi
+          echo "value=$DIGEST" >> "$GITHUB_OUTPUT"
+          # #region agent log
+          echo "DEPLOY_DIGEST=$DIGEST"
+          # #endregion
+
   deploy:
     name: Deploy to Tencent Cloud
     runs-on: ubuntu-latest
@@ -132,13 +149,16 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
+          envs: BACKEND_IMAGE
           script: |
             set -euxo pipefail
+            TARGET_REF="${BACKEND_IMAGE}@${{ steps.deploy_digest.outputs.value }}"
             # #region agent log
             echo "=== backend deploy debug: host info ==="
             hostname
             date
             echo "DEPLOY_PATH=${{ secrets.DEPLOY_PATH }}"
+            echo "TARGET_REF=${TARGET_REF}"
             # #endregion
             if [ ! -d "${{ secrets.DEPLOY_PATH }}" ]; then
               mkdir -p "${{ secrets.DEPLOY_PATH }}"
@@ -172,8 +192,9 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
-            # 拉取并启动后端
-            docker compose pull backend
+            # 拉取并固定到本次构建 digest，避免 latest 标签漂移或缓存不一致
+            docker pull "${TARGET_REF}"
+            docker tag "${TARGET_REF}" "${BACKEND_IMAGE}:latest"
             echo "=== backend deploy debug: backend image after pull ==="
             docker image inspect vic777/rust-backend:latest --format '{{.Id}} {{index .RepoDigests 0}}' || true
             # 强制移除旧容器，确保新镜像生效
