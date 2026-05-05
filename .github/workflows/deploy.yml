@@ -69,6 +69,7 @@ jobs:
 
       - name: Build and push rust-backend (subdir)
         if: ${{ steps.cred.outputs.has == 'true' && steps.df.outputs.use_subdir == 'true' }}
+        id: build_subdir
         uses: docker/build-push-action@v6
         with:
           context: rust-backend
@@ -84,6 +85,7 @@ jobs:
 
       - name: Build and push rust-backend (root)
         if: ${{ steps.cred.outputs.has == 'true' && steps.df.outputs.use_subdir == 'false' }}
+        id: build_root
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -96,6 +98,17 @@ jobs:
             ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', env.BACKEND_IMAGE, steps.meta.outputs.ref_tag) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Debug build metadata
+        if: ${{ steps.cred.outputs.has == 'true' }}
+        run: |
+          # #region agent log
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "BACKEND_IMAGE=${{ env.BACKEND_IMAGE }}"
+          echo "SUBDIR_DIGEST=${{ steps.build_subdir.outputs.digest }}"
+          echo "ROOT_DIGEST=${{ steps.build_root.outputs.digest }}"
+          # #endregion
 
   deploy:
     name: Deploy to Tencent Cloud
@@ -121,13 +134,34 @@ jobs:
           port: ${{ secrets.SERVER_SSH_PORT }}
           script: |
             set -euxo pipefail
+            # #region agent log
+            echo "=== backend deploy debug: host info ==="
+            hostname
+            date
+            echo "DEPLOY_PATH=${{ secrets.DEPLOY_PATH }}"
+            # #endregion
             if [ ! -d "${{ secrets.DEPLOY_PATH }}" ]; then
               mkdir -p "${{ secrets.DEPLOY_PATH }}"
             fi
             cd "${{ secrets.DEPLOY_PATH }}"
+            # #region agent log
+            echo "=== backend deploy debug: working dir ==="
+            pwd
+            ls -la
+            # #endregion
             if [ ! -f ".env" ]; then
               printf 'ALLOWED_ORIGINS=\nHOST=0.0.0.0\nPORT=8000\n' > .env
             fi
+            # #region agent log
+            echo "=== backend deploy debug: compose services ==="
+            docker compose config --services || true
+            echo "=== backend deploy debug: backend image before pull ==="
+            docker compose images backend || true
+            echo "=== backend deploy debug: local latest backend digest ==="
+            docker image inspect vic777/rust-backend:latest --format '{{.Id}} {{index .RepoDigests 0}}' || true
+            echo "=== backend deploy debug: registry connectivity ==="
+            curl -I --max-time 15 https://registry-1.docker.io/v2/ || true
+            # #endregion
             # 确保 PostgreSQL 运行并执行数据库迁移
             docker compose up -d postgres
             sleep 5
@@ -141,6 +175,12 @@ jobs:
             # 拉取并启动后端
             docker compose pull backend
             docker compose up -d backend
+            # #region agent log
+            echo "=== backend deploy debug: backend container after deploy ==="
+            docker compose ps backend || true
+            docker compose images backend || true
+            docker inspect stock-backend-axum --format '{{.Image}}' || true
+            # #endregion
             docker image prune -f
 
 
