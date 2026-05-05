@@ -174,7 +174,11 @@ jobs:
 
             # 拉取并启动后端
             docker compose pull backend
-            docker compose up -d backend
+            echo "=== backend deploy debug: backend image after pull ==="
+            docker image inspect vic777/rust-backend:latest --format '{{.Id}} {{index .RepoDigests 0}}' || true
+            # 强制移除旧容器，确保新镜像生效
+            docker compose rm -sf backend || true
+            docker compose up -d --no-deps --force-recreate backend
             # #region agent log
             echo "=== backend deploy debug: backend container after deploy ==="
             docker compose ps backend || true
