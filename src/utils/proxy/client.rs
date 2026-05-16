@@ -105,8 +105,7 @@ impl ProxyClient {
 
     #[allow(dead_code)]
     pub async fn get_with_proxy(&mut self, url: &str) -> Result<String, ProxyError> {
-        self.request_with_proxy(Method::GET, url, None, None)
-            .await
+        self.request_with_proxy(Method::GET, url, None, None).await
     }
 
     #[allow(dead_code)]
@@ -186,7 +185,9 @@ impl ProxyClient {
                 let request_id = api_resp.request_id;
 
                 // 对提取失败进行容错重试
-                if matches!(code.as_str(), "FAILED_OPERATION" | "NO_RESOURCE_FOUND") && attempt < self.max_retries {
+                if matches!(code.as_str(), "FAILED_OPERATION" | "NO_RESOURCE_FOUND")
+                    && attempt < self.max_retries
+                {
                     continue;
                 }
 
@@ -211,8 +212,8 @@ impl ProxyClient {
 
     fn build_proxy_client(&self, server: &str) -> Result<Client, ProxyError> {
         let proxy_url = format!("http://{}:{}@{}", self.auth_key, self.auth_pwd, server);
-        let proxy = Proxy::http(&proxy_url)
-            .map_err(|_| ProxyError::InvalidProxyUrl(proxy_url.clone()))?;
+        let proxy =
+            Proxy::http(&proxy_url).map_err(|_| ProxyError::InvalidProxyUrl(proxy_url.clone()))?;
 
         Ok(Client::builder()
             .proxy(proxy)
@@ -273,5 +274,3 @@ fn parse_deadline(deadline: &str) -> DateTime<Local> {
 
     Local::now() + Duration::seconds(DEFAULT_TTL_SECS)
 }
-
-

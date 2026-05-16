@@ -15,7 +15,9 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         match self {
-            AppError::NotFound => (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response(),
+            AppError::NotFound => {
+                (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response()
+            }
             AppError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
                 Json(json!({"error": "bad request", "message": msg})),
@@ -29,4 +31,3 @@ impl IntoResponse for AppError {
         }
     }
 }
-

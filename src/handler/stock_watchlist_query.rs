@@ -1,8 +1,5 @@
-use axum::{
-    extract::State,
-    Json,
-};
-use chrono::{Utc, NaiveDate, FixedOffset};
+use axum::{extract::State, Json};
+use chrono::{FixedOffset, NaiveDate, Utc};
 use serde_json;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -10,14 +7,14 @@ use tokio::task::JoinSet;
 
 use crate::api_models::stock_trade_date_query::PlateInfo;
 use crate::api_models::stock_watchlist_query::{
-    WatchlistQueryRequest, WatchlistQueryItem, WatchlistQueryResponse,
-    WatchlistDetailRequest, WatchlistDetailItem, WatchlistDetailResponse,
-    WatchlistKlineRequest, WatchlistKlineItem, WatchlistKlineResponse,
-    WatchlistFillKlineRequest, WatchlistFillKlineResponse, StockFillKlineDetail,
+    StockFillKlineDetail, WatchlistDetailItem, WatchlistDetailRequest, WatchlistDetailResponse,
+    WatchlistFillKlineRequest, WatchlistFillKlineResponse, WatchlistKlineItem,
+    WatchlistKlineRequest, WatchlistKlineResponse, WatchlistQueryItem, WatchlistQueryRequest,
+    WatchlistQueryResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
-use crate::repositories::{stock_watchlist_query, stock_watchlist, daily_kline};
+use crate::repositories::{daily_kline, stock_watchlist, stock_watchlist_query};
 use crate::services::kline_service;
 use crate::utils::http_client;
 
@@ -97,14 +94,12 @@ pub async fn query_stock_detail(
         .map_err(|_| AppError::InternalServerError)?;
 
     // 查询股票明细
-    let results = stock_watchlist_query::query_stock_snapshot_detail(
-        &mut conn,
-        &payload.stock_code,
-    )
-    .map_err(|e| {
-        tracing::error!("Failed to query stock detail: {}", e);
-        AppError::InternalServerError
-    })?;
+    let results =
+        stock_watchlist_query::query_stock_snapshot_detail(&mut conn, &payload.stock_code)
+            .map_err(|e| {
+                tracing::error!("Failed to query stock detail: {}", e);
+                AppError::InternalServerError
+            })?;
 
     let total = results.len() as i64;
 
@@ -150,14 +145,13 @@ pub async fn query_stock_kline(
         .map_err(|_| AppError::InternalServerError)?;
 
     // 查找首次出现日期
-    let start_date = stock_watchlist_query::find_first_occurrence_date(
-        &mut conn,
-        &payload.stock_code,
-    )
-    .map_err(|e| {
-        tracing::error!("Failed to find first occurrence date: {}", e);
-        AppError::InternalServerError
-    })?;
+    let start_date =
+        stock_watchlist_query::find_first_occurrence_date(&mut conn, &payload.stock_code).map_err(
+            |e| {
+                tracing::error!("Failed to find first occurrence date: {}", e);
+                AppError::InternalServerError
+            },
+        )?;
 
     // 如果没有找到首次出现日期，返回空结果
     let start_date = match start_date {
@@ -225,13 +219,12 @@ pub async fn fill_watchlist_klines(
                 .db_pool
                 .get()
                 .map_err(|_| AppError::InternalServerError)?;
-            
-            let watchlist_items = stock_watchlist::list_all(&mut conn)
-                .map_err(|e| {
-                    tracing::error!("Failed to list watchlist stocks: {}", e);
-                    AppError::InternalServerError
-                })?;
-            
+
+            let watchlist_items = stock_watchlist::list_all(&mut conn).map_err(|e| {
+                tracing::error!("Failed to list watchlist stocks: {}", e);
+                AppError::InternalServerError
+            })?;
+
             watchlist_items
                 .into_iter()
                 .map(|item| item.stock_code)
@@ -245,19 +238,18 @@ pub async fn fill_watchlist_klines(
             .db_pool
             .get()
             .map_err(|_| AppError::InternalServerError)?;
-        
-        let watchlist_items = stock_watchlist::list_all(&mut conn)
-            .map_err(|e| {
-                tracing::error!("Failed to list watchlist stocks: {}", e);
-                AppError::InternalServerError
-            })?;
-        
+
+        let watchlist_items = stock_watchlist::list_all(&mut conn).map_err(|e| {
+            tracing::error!("Failed to list watchlist stocks: {}", e);
+            AppError::InternalServerError
+        })?;
+
         watchlist_items
             .into_iter()
             .map(|item| item.stock_code)
             .collect()
     };
-    
+
     if stock_codes.is_empty() {
         return Ok(Json(WatchlistFillKlineResponse {
             total_stocks: 0,
@@ -267,36 +259,35 @@ pub async fn fill_watchlist_klines(
             stock_details: Vec::new(),
         }));
     }
-    
+
     // 2. 创建HTTP客户端
-    let client = http_client::create_em_client()
-        .map_err(|_| AppError::InternalServerError)?;
-    
+    let client = http_client::create_em_client().map_err(|_| AppError::InternalServerError)?;
+
     // 3. 并发处理每个股票
     const HTTP_CONCURRENCY: usize = 10;
     const DB_CONCURRENCY: usize = 5;
-    
+
     let http_semaphore = Arc::new(Semaphore::new(HTTP_CONCURRENCY));
     let db_semaphore = Arc::new(Semaphore::new(DB_CONCURRENCY));
     let mut join_set = JoinSet::new();
-    
+
     for stock_code in stock_codes.iter().cloned() {
         let pool = state.db_pool.clone();
         let client = client.clone();
         let http_sem = http_semaphore.clone();
         let db_sem = db_semaphore.clone();
-        
+
         join_set.spawn(async move {
             fill_single_stock_klines(pool, client, stock_code, http_sem, db_sem).await
         });
     }
-    
+
     // 4. 收集结果
     let mut success_count = 0;
     let mut failed_count = 0;
     let mut skipped_count = 0;
     let mut stock_details = Vec::new();
-    
+
     while let Some(res) = join_set.join_next().await {
         match res {
             Ok(StockFillOutcome::Success(detail)) => {
@@ -323,7 +314,7 @@ pub async fn fill_watchlist_klines(
             }
         }
     }
-    
+
     Ok(Json(WatchlistFillKlineResponse {
         total_stocks: stock_codes.len(),
         success_count,
@@ -371,7 +362,7 @@ async fn fill_single_stock_klines(
                 });
             }
         };
-        
+
         match stock_watchlist_query::find_first_occurrence_date(&mut conn, &stock_code) {
             Ok(Some(date)) => date,
             Ok(None) => {
@@ -384,7 +375,11 @@ async fn fill_single_stock_klines(
                 });
             }
             Err(e) => {
-                tracing::error!("Failed to query first occurrence date for {}: {}", stock_code, e);
+                tracing::error!(
+                    "Failed to query first occurrence date for {}: {}",
+                    stock_code,
+                    e
+                );
                 return StockFillOutcome::Failed(StockFillKlineDetail {
                     stock_code: stock_code.clone(),
                     imported_count: 0,
@@ -394,12 +389,12 @@ async fn fill_single_stock_klines(
             }
         }
     };
-    
+
     // 2. 获取当前时间（UTC+8）
     let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
     let now_utc8 = Utc::now().with_timezone(&utc_plus_8);
     let end_date = now_utc8.date_naive();
-    
+
     // 2. 查询已存在的K线日期
     let existing_dates = {
         let _db_permit = match db_semaphore.clone().acquire_owned().await {
@@ -424,8 +419,13 @@ async fn fill_single_stock_klines(
                 });
             }
         };
-        
-        match stock_watchlist_query::find_existing_kline_dates(&mut conn, &stock_code, start_date, end_date) {
+
+        match stock_watchlist_query::find_existing_kline_dates(
+            &mut conn,
+            &stock_code,
+            start_date,
+            end_date,
+        ) {
             Ok(dates) => dates,
             Err(e) => {
                 tracing::warn!("Failed to query existing dates for {}: {}", stock_code, e);
@@ -433,17 +433,18 @@ async fn fill_single_stock_klines(
             }
         }
     };
-    
-    let existing_dates_set: std::collections::HashSet<NaiveDate> = existing_dates.into_iter().collect();
-    
+
+    let existing_dates_set: std::collections::HashSet<NaiveDate> =
+        existing_dates.into_iter().collect();
+
     // 3. 检查是否所有日期都已存在（如果范围很大，只检查开始和结束日期）
     // 注意：这里不生成所有日期列表，因为东方财富API支持日期范围查询
     // 我们直接查询整个范围，然后在插入时跳过已存在的日期
-    
+
     // 4. 按日期范围批量获取K线数据（从首次出现日期到当前时间UTC+8）
     let start_date_str = start_date.format("%Y%m%d").to_string();
     let end_date_str = end_date.format("%Y%m%d").to_string();
-    
+
     let _http_permit = match http_semaphore.acquire_owned().await {
         Ok(permit) => permit,
         Err(_) => {
@@ -455,14 +456,16 @@ async fn fill_single_stock_klines(
             });
         }
     };
-    
+
     // 5. 获取K线数据
     let kline_result = match kline_service::fetch_and_parse_kline_data(
         &client,
         &stock_code,
         &start_date_str,
         &end_date_str,
-    ).await {
+    )
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             return StockFillOutcome::Failed(StockFillKlineDetail {
@@ -473,13 +476,14 @@ async fn fill_single_stock_klines(
             });
         }
     };
-    
+
     // 4. 过滤出需要插入的数据（排除已存在的日期）
-    let klines_to_insert: Vec<_> = kline_result.parsed
+    let klines_to_insert: Vec<_> = kline_result
+        .parsed
         .into_iter()
         .filter(|kline| !existing_dates_set.contains(&kline.trade_date))
         .collect();
-    
+
     if klines_to_insert.is_empty() {
         return StockFillOutcome::Skipped(StockFillKlineDetail {
             stock_code: stock_code.clone(),
@@ -488,11 +492,11 @@ async fn fill_single_stock_klines(
             error: Some("No new data to insert".to_string()),
         });
     }
-    
+
     // 5. 批量插入数据库
     let mut imported_count = 0;
     let mut last_error = None;
-    
+
     for kline_data in klines_to_insert {
         let _db_permit = match db_semaphore.clone().acquire_owned().await {
             Ok(permit) => permit,
@@ -508,7 +512,7 @@ async fn fill_single_stock_klines(
                 break;
             }
         };
-        
+
         match daily_kline::create(&mut conn, &kline_data) {
             Ok(_) => imported_count += 1,
             Err(diesel::result::Error::DatabaseError(
@@ -518,15 +522,19 @@ async fn fill_single_stock_klines(
                 // 重复数据，忽略（可能并发插入导致）
             }
             Err(e) => {
-                tracing::warn!("Failed to insert kline for {} on {}: {}", 
-                    stock_code, kline_data.trade_date, e);
+                tracing::warn!(
+                    "Failed to insert kline for {} on {}: {}",
+                    stock_code,
+                    kline_data.trade_date,
+                    e
+                );
                 if last_error.is_none() {
                     last_error = Some(format!("Insert error: {e}"));
                 }
             }
         }
     }
-    
+
     if imported_count > 0 {
         StockFillOutcome::Success(StockFillKlineDetail {
             stock_code,

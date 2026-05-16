@@ -1,15 +1,12 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use chrono::NaiveDate;
 use serde_json;
 
-use crate::api_models::stock_trade_date_query::PlateInfo;
 use crate::api_models::stock_track_query::{
-    TrackQueryRequest, TrackQueryItem, TrackQueryResponse, OccurrenceStats,
-    TrackDetailRequest, TrackDetailItem, TrackDetailResponse,
+    OccurrenceStats, TrackDetailItem, TrackDetailRequest, TrackDetailResponse, TrackQueryItem,
+    TrackQueryRequest, TrackQueryResponse,
 };
+use crate::api_models::stock_trade_date_query::PlateInfo;
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::repositories::stock_track_query;
@@ -18,7 +15,7 @@ use crate::repositories::stock_track_query;
 /// 14天≥3次，7天≥2次，3天≥2次
 fn generate_tag(days_3: i32, days_7: i32, days_14: i32, min_occurrences_14: i32) -> String {
     let mut tags = Vec::new();
-    
+
     if days_14 >= min_occurrences_14 {
         tags.push(format!("14天{days_14}次"));
     }
@@ -28,7 +25,7 @@ fn generate_tag(days_3: i32, days_7: i32, days_14: i32, min_occurrences_14: i32)
     if days_3 >= 2 {
         tags.push(format!("3天{days_3}次"));
     }
-    
+
     if tags.is_empty() {
         String::new()
     } else {
@@ -42,12 +39,15 @@ pub async fn query_tracked_stocks(
     Json(payload): Json<TrackQueryRequest>,
 ) -> Result<Json<TrackQueryResponse>, AppError> {
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 验证最少出现次数参数
     if payload.min_occurrences < 1 {
-        return Err(AppError::BadRequest("min_occurrences must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "min_occurrences must be greater than 0".to_string(),
+        ));
     }
 
     // 获取数据库连接
@@ -74,7 +74,12 @@ pub async fn query_tracked_stocks(
         .into_iter()
         .map(|r| {
             let plates: Vec<PlateInfo> = serde_json::from_value(r.plates).unwrap_or_default();
-            let tag = generate_tag(r.days_3_count, r.days_7_count, r.days_14_count, payload.min_occurrences);
+            let tag = generate_tag(
+                r.days_3_count,
+                r.days_7_count,
+                r.days_14_count,
+                payload.min_occurrences,
+            );
 
             TrackQueryItem {
                 stock_code: r.stock_code,
@@ -107,12 +112,15 @@ pub async fn query_stock_track_detail(
     Json(payload): Json<TrackDetailRequest>,
 ) -> Result<Json<TrackDetailResponse>, AppError> {
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 验证追踪天数参数
     if ![3, 7, 14].contains(&payload.track_days) {
-        return Err(AppError::BadRequest("track_days must be 3, 7, or 14".to_string()));
+        return Err(AppError::BadRequest(
+            "track_days must be 3, 7, or 14".to_string(),
+        ));
     }
 
     // 验证股票代码

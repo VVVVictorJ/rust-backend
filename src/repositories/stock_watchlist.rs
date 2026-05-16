@@ -8,7 +8,10 @@ use crate::schema::stock_watchlist::dsl::*;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
-pub fn create(conn: &mut PgPoolConn, new_item: &NewStockWatchlist) -> Result<StockWatchlist, diesel::result::Error> {
+pub fn create(
+    conn: &mut PgPoolConn,
+    new_item: &NewStockWatchlist,
+) -> Result<StockWatchlist, diesel::result::Error> {
     diesel::insert_into(stock_watchlist)
         .values(new_item)
         .get_result(conn)

@@ -1,9 +1,11 @@
-use axum::{routing::{get, post, delete}, Router};
+use axum::{
+    routing::{delete, get, post},
+    Router,
+};
 
 use crate::app::AppState;
 use crate::handler::stock_watchlist::{
-    add_to_watchlist, batch_check_watchlist, check_watchlist, list_watchlist,
-    remove_from_watchlist,
+    add_to_watchlist, batch_check_watchlist, check_watchlist, list_watchlist, remove_from_watchlist,
 };
 
 pub fn router() -> Router<AppState> {

@@ -10,5 +10,3 @@ pub fn normalize_percent_scalar<S: AsRef<str>>(s: S) -> Option<f64> {
     }
     Some(val)
 }
-
-

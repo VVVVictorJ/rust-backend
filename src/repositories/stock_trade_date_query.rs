@@ -1,8 +1,8 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{BigInt, Numeric, Text, Timestamptz, Nullable, Jsonb};
-use bigdecimal::BigDecimal;
+use diesel::sql_types::{BigInt, Jsonb, Nullable, Numeric, Text, Timestamptz};
 use serde_json::Value;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
@@ -90,7 +90,7 @@ pub fn query_by_trade_date(
         LIMIT $2 OFFSET $3;
     "#;
     // let query = r#"
-    //     SELECT 
+    //     SELECT
     //         a.stock_code,
     //         a.stock_name,
     //         a.latest_price,
@@ -106,13 +106,13 @@ pub fn query_by_trade_date(
     //                 FILTER (WHERE sp.id IS NOT NULL),
     //             '[]'::jsonb
     //         ) AS plates
-    //     FROM stock_snapshots a 
-    //     LEFT JOIN daily_klines dk ON a.stock_code = dk.stock_code 
+    //     FROM stock_snapshots a
+    //     LEFT JOIN daily_klines dk ON a.stock_code = dk.stock_code
     //     LEFT JOIN stock_table st ON a.stock_code = st.stock_code
     //     LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
     //     LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
     //     WHERE a.main_force_inflow > 0
-    //       AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = dk.trade_date 
+    //       AND (a.created_at AT TIME ZONE 'Asia/Shanghai')::date = dk.trade_date
     //       AND dk.trade_date = $1
     //     GROUP BY
     //         a.stock_code,
@@ -180,4 +180,3 @@ pub fn list_stocks_by_trade_date(
         .bind::<diesel::sql_types::Date, _>(trade_date)
         .load::<TradeDateStockInfo>(conn)
 }
-

@@ -21,4 +21,3 @@ pub struct ImportKlineResponse {
     pub failed_count: usize,
     pub errors: Vec<String>,
 }
-

@@ -15,7 +15,10 @@ pub async fn create_stock_request_stock(
     State(state): State<AppState>,
     Json(payload): Json<CreateStockRequestStock>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let new_rec = NewStockRequestStock {
         request_id: payload.request_id,
         stock_code: payload.stock_code,
@@ -28,7 +31,10 @@ pub async fn get_stock_request_stock(
     State(state): State<AppState>,
     Path((req_id, code)): Path<(i32, String)>,
 ) -> Result<Json<StockRequestStockResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let found = stock_request_stock::find_by_pk(&mut conn, req_id, &code).map_err(map_err)?;
     Ok(Json(StockRequestStockResponse {
         request_id: found.request_id,
@@ -40,7 +46,10 @@ pub async fn delete_stock_request_stock(
     State(state): State<AppState>,
     Path((req_id, code)): Path<(i32, String)>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let affected = stock_request_stock::delete_by_pk(&mut conn, req_id, &code).map_err(map_err)?;
     if affected == 0 {
         return Err(AppError::NotFound);
@@ -54,4 +63,3 @@ fn map_err(err: DieselError) -> AppError {
         _ => AppError::InternalServerError,
     }
 }
-

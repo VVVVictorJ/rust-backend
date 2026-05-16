@@ -2,13 +2,12 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use chrono::{NaiveDate, Utc, FixedOffset};
+use chrono::{FixedOffset, NaiveDate, Utc};
 use serde_json::json;
 
 use crate::api_models::ai_analysis::{
+    TrendDetailResponse, TrendHistoryItem, TrendHistoryRequest, TrendHistoryResponse,
     TrendPredictionRequest, TrendPredictionResponse,
-    TrendHistoryRequest, TrendHistoryItem, TrendHistoryResponse,
-    TrendDetailResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
@@ -32,7 +31,10 @@ pub async fn trend_prediction(
 
     // 1. 查询 stock_snapshots 获取该股票的信号数据
     let (signals, stock_name) = {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         query_stock_signals(&mut conn, &stock_code_input)?
     };
 
@@ -43,15 +45,14 @@ pub async fn trend_prediction(
     }
 
     // 2. 找到最早信号日期
-    let earliest_signal_date = signals
-        .iter()
-        .map(|s| s.signal_date)
-        .min()
-        .unwrap();
+    let earliest_signal_date = signals.iter().map(|s| s.signal_date).min().unwrap();
 
     // 3. 查询 stock_trading_calendar，从最早信号日往前找20个交易日
     let kline_start_date = {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         find_trading_date_before(&mut conn, earliest_signal_date, 20)?
     };
 
@@ -61,7 +62,10 @@ pub async fn trend_prediction(
 
     // 5. 查询 daily_klines 获取K线数据
     let klines = {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         query_kline_range(&mut conn, &stock_code_input, kline_start_date, today)?
     };
 
@@ -69,11 +73,16 @@ pub async fn trend_prediction(
     let klines = if klines.is_empty() || needs_kline_fill(&klines, kline_start_date, today) {
         tracing::info!(
             "K线数据不完整，自动补齐 {} 从 {} 到 {}",
-            stock_code_input, kline_start_date, today
+            stock_code_input,
+            kline_start_date,
+            today
         );
         fill_missing_klines(&state, &stock_code_input, kline_start_date, today).await?;
         // 重新查询完整数据
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         query_kline_range(&mut conn, &stock_code_input, kline_start_date, today)?
     } else {
         klines
@@ -127,7 +136,10 @@ pub async fn trend_prediction(
     };
 
     let record = {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         ai_trend_analysis::create(&mut conn, &new_record).map_err(|e| {
             tracing::error!("Failed to create ai_trend_analysis record: {}", e);
             AppError::InternalServerError
@@ -154,12 +166,7 @@ pub async fn trend_prediction(
         ),
         Err(e) => {
             tracing::error!("AI analysis failed for {}: {}", stock_code_input, e);
-            (
-                "failed".to_string(),
-                None,
-                None,
-                Some(e.to_string()),
-            )
+            ("failed".to_string(), None, None, Some(e.to_string()))
         }
     };
 
@@ -173,7 +180,10 @@ pub async fn trend_prediction(
     };
 
     let updated_record = {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         ai_trend_analysis::update_by_id(&mut conn, record.id, &update_data).map_err(|e| {
             tracing::error!("Failed to update ai_trend_analysis record: {}", e);
             AppError::InternalServerError
@@ -195,7 +205,10 @@ pub async fn trend_history(
     State(state): State<AppState>,
     Query(params): Query<TrendHistoryRequest>,
 ) -> Result<Json<TrendHistoryResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let (records, total) = ai_trend_analysis::list_history(
         &mut conn,
@@ -233,7 +246,10 @@ pub async fn trend_detail(
     State(state): State<AppState>,
     Path(record_id): Path<i32>,
 ) -> Result<Json<TrendDetailResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let record = ai_trend_analysis::find_by_id(&mut conn, record_id)
         .map_err(|e| {
@@ -269,13 +285,15 @@ struct KlineData {
 
 /// 查询股票的信号数据（从 stock_snapshots）
 fn query_stock_signals(
-    conn: &mut diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
+    conn: &mut diesel::r2d2::PooledConnection<
+        diesel::r2d2::ConnectionManager<diesel::PgConnection>,
+    >,
     stock_code_input: &str,
 ) -> Result<(Vec<SignalData>, Option<String>), AppError> {
-    use diesel::prelude::*;
-    use diesel::sql_types::{Text, Numeric, Timestamptz};
-    use chrono::{DateTime, Utc as ChronoUtc};
     use bigdecimal::BigDecimal;
+    use chrono::{DateTime, Utc as ChronoUtc};
+    use diesel::prelude::*;
+    use diesel::sql_types::{Numeric, Text, Timestamptz};
 
     #[derive(Debug, QueryableByName)]
     struct SnapshotSignal {
@@ -339,7 +357,9 @@ fn query_stock_signals(
 
 /// 查询最早信号日之前的第N个交易日
 fn find_trading_date_before(
-    conn: &mut diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
+    conn: &mut diesel::r2d2::PooledConnection<
+        diesel::r2d2::ConnectionManager<diesel::PgConnection>,
+    >,
     before_date: NaiveDate,
     count: i64,
 ) -> Result<NaiveDate, AppError> {
@@ -394,14 +414,16 @@ fn find_trading_date_before(
 
 /// 查询 K线数据范围
 fn query_kline_range(
-    conn: &mut diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
+    conn: &mut diesel::r2d2::PooledConnection<
+        diesel::r2d2::ConnectionManager<diesel::PgConnection>,
+    >,
     stock_code_input: &str,
     start: NaiveDate,
     end: NaiveDate,
 ) -> Result<Vec<KlineData>, AppError> {
-    use diesel::prelude::*;
-    use diesel::sql_types::{Text, Date, Numeric, BigInt};
     use bigdecimal::BigDecimal;
+    use diesel::prelude::*;
+    use diesel::sql_types::{BigInt, Date, Numeric, Text};
 
     #[derive(Debug, QueryableByName)]
     struct KlineRow {
@@ -481,17 +503,13 @@ async fn fill_missing_klines(
     let start_str = start.format("%Y%m%d").to_string();
     let end_str = end.format("%Y%m%d").to_string();
 
-    let kline_result = kline_service::fetch_and_parse_kline_data(
-        &client,
-        stock_code_input,
-        &start_str,
-        &end_str,
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to fetch kline data for {}: {}", stock_code_input, e);
-        AppError::InternalServerError
-    })?;
+    let kline_result =
+        kline_service::fetch_and_parse_kline_data(&client, stock_code_input, &start_str, &end_str)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch kline data for {}: {}", stock_code_input, e);
+                AppError::InternalServerError
+            })?;
 
     tracing::info!(
         "Fetched {} klines for {}, inserting into DB",
@@ -501,7 +519,10 @@ async fn fill_missing_klines(
 
     // 批量写入数据库
     for kline_data in &kline_result.parsed {
-        let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+        let mut conn = state
+            .db_pool
+            .get()
+            .map_err(|_| AppError::InternalServerError)?;
         match daily_kline::create(&mut conn, kline_data) {
             Ok(_) => {}
             Err(diesel::result::Error::DatabaseError(

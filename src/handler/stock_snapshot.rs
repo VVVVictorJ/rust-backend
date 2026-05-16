@@ -6,7 +6,9 @@ use axum::{
 use diesel::result::Error as DieselError;
 use serde::Serialize;
 
-use crate::api_models::stock_snapshot::{CreateStockSnapshot, StockSnapshotResponse, TodayStockCodesResponse};
+use crate::api_models::stock_snapshot::{
+    CreateStockSnapshot, StockSnapshotResponse, TodayStockCodesResponse,
+};
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::models::NewStockSnapshot;
@@ -34,7 +36,10 @@ pub async fn get_stock_snapshot(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<StockSnapshotResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let found = stock_snapshot::find_by_id(&mut conn, id).map_err(map_err)?;
     Ok(Json(found.into()))
 }
@@ -48,7 +53,10 @@ pub async fn create_stock_snapshot(
     State(state): State<AppState>,
     Json(payload): Json<CreateStockSnapshot>,
 ) -> Result<(StatusCode, Json<InsertResponse>), AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let new_rec = NewStockSnapshot {
         request_id: payload.request_id,
         stock_code: payload.stock_code,
@@ -68,7 +76,10 @@ pub async fn delete_stock_snapshot(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let affected = stock_snapshot::delete_by_id(&mut conn, id).map_err(map_err)?;
     if affected == 0 {
         return Err(AppError::NotFound);
@@ -79,7 +90,10 @@ pub async fn delete_stock_snapshot(
 pub async fn get_today_stock_codes(
     State(state): State<AppState>,
 ) -> Result<Json<TodayStockCodesResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let codes = stock_snapshot::get_distinct_codes_today(&mut conn).map_err(map_err)?;
     let count = codes.len();
     Ok(Json(TodayStockCodesResponse {
@@ -94,4 +108,3 @@ fn map_err(err: DieselError) -> AppError {
         _ => AppError::InternalServerError,
     }
 }
-

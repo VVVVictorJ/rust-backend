@@ -1,11 +1,11 @@
+use rand::Rng;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Url};
 use serde_json::Value;
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use rand::Rng;
-use std::sync::Arc;
 
 use crate::api_models::stock_plate_em::{EmPlateItem, EmPlateResponse};
 use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyClient, ProxyError};

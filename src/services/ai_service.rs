@@ -76,17 +76,17 @@ pub async fn call_qwen_analysis(
     client: &Client,
     user_payload: &JsonValue,
 ) -> Result<AiAnalysisResult, AiServiceError> {
-    let api_url = std::env::var("QWEN_API_URL")
-        .unwrap_or_else(|_| "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions".to_string());
+    let api_url = std::env::var("QWEN_API_URL").unwrap_or_else(|_| {
+        "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions".to_string()
+    });
     let api_key = std::env::var("QWEN_API_KEY")
         .map_err(|_| AiServiceError::EnvError("QWEN_API_KEY not set".to_string()))?;
-    let model = std::env::var("QWEN_MODEL")
-        .unwrap_or_else(|_| "qwen3-max-2026-01-23".to_string());
+    let model = std::env::var("QWEN_MODEL").unwrap_or_else(|_| "qwen3-max-2026-01-23".to_string());
 
     let system_prompt = load_system_prompt();
 
-    let user_content = serde_json::to_string_pretty(user_payload)
-        .map_err(AiServiceError::SerdeJson)?;
+    let user_content =
+        serde_json::to_string_pretty(user_payload).map_err(AiServiceError::SerdeJson)?;
 
     let request_body = ChatCompletionRequest {
         model,
@@ -119,16 +119,24 @@ pub async fn call_qwen_analysis(
     let response_text = response.text().await.map_err(AiServiceError::Http)?;
 
     if !status.is_success() {
-        tracing::error!("Qwen API returned error status {}: {}", status, response_text);
+        tracing::error!(
+            "Qwen API returned error status {}: {}",
+            status,
+            response_text
+        );
         return Err(AiServiceError::ApiError(format!(
             "API returned status {status}: {response_text}"
         )));
     }
 
     // 解析 API 响应
-    let api_response: ChatCompletionResponse = serde_json::from_str(&response_text)
-        .map_err(|e| {
-            tracing::error!("Failed to parse Qwen API response: {} | raw: {}", e, response_text);
+    let api_response: ChatCompletionResponse =
+        serde_json::from_str(&response_text).map_err(|e| {
+            tracing::error!(
+                "Failed to parse Qwen API response: {} | raw: {}",
+                e,
+                response_text
+            );
             AiServiceError::ParseError(format!("Failed to parse API response: {e}"))
         })?;
 

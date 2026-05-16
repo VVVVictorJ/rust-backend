@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskStatusMessage {
@@ -18,20 +18,15 @@ pub fn create_broadcast_channel() -> TaskStatusSender {
     tx
 }
 
-pub fn broadcast_task_status(
-    sender: &TaskStatusSender,
-    job_name: String,
-    status: String,
-) {
+pub fn broadcast_task_status(sender: &TaskStatusSender, job_name: String, status: String) {
     let msg = TaskStatusMessage {
         job_name,
         status,
         timestamp: chrono::Utc::now().timestamp_millis(),
     };
-    
+
     let job_name = msg.job_name.clone();
     let status = msg.status.clone();
     let _ = sender.send(msg);
     tracing::debug!("广播任务状态: {} -> {}", job_name, status);
 }
-

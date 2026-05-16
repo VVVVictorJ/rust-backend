@@ -1,7 +1,7 @@
 use axum::{routing::post, Router};
 
 use crate::app::AppState;
-use crate::handler::stock_track_query::{query_tracked_stocks, query_stock_track_detail};
+use crate::handler::stock_track_query::{query_stock_track_detail, query_tracked_stocks};
 
 pub fn router() -> Router<AppState> {
     Router::new()

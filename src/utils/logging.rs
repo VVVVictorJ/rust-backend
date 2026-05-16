@@ -1,8 +1,8 @@
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt, fmt};
-use tracing_subscriber::fmt::time::FormatTime;
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use chrono::Utc;
 use chrono_tz::Asia::Shanghai;
+use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// 自定义时间格式化器，使用 UTC+8 (上海时区)
 struct ShanghaiTime;
@@ -32,18 +32,15 @@ pub fn init_logging() {
 
     if log_to_file {
         let log_dir = std::env::var("LOG_DIR").unwrap_or_else(|_| "./logs".to_string());
-        
+
         // 按天轮转日志文件
-        let file_appender = RollingFileAppender::new(
-            Rotation::DAILY,
-            &log_dir,
-            "stock-backend.log"
-        );
-        
+        let file_appender =
+            RollingFileAppender::new(Rotation::DAILY, &log_dir, "stock-backend.log");
+
         let file_layer = fmt::layer()
             .with_timer(ShanghaiTime)
             .with_writer(file_appender)
-            .with_ansi(false)  // 文件不需要 ANSI 颜色
+            .with_ansi(false) // 文件不需要 ANSI 颜色
             .with_target(true)
             .with_thread_ids(true)
             .with_line_number(true);

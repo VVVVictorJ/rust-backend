@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 use super::stock_trade_date_query::PlateInfo;
 

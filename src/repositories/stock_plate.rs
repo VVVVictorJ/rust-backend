@@ -8,13 +8,19 @@ use crate::schema::stock_plate::dsl::*;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
-pub fn create(conn: &mut PgPoolConn, new_plate: &NewStockPlate) -> Result<StockPlate, diesel::result::Error> {
+pub fn create(
+    conn: &mut PgPoolConn,
+    new_plate: &NewStockPlate,
+) -> Result<StockPlate, diesel::result::Error> {
     diesel::insert_into(stock_plate)
         .values(new_plate)
         .get_result(conn)
 }
 
-pub fn find_by_id(conn: &mut PgPoolConn, plate_id: i32) -> Result<StockPlate, diesel::result::Error> {
+pub fn find_by_id(
+    conn: &mut PgPoolConn,
+    plate_id: i32,
+) -> Result<StockPlate, diesel::result::Error> {
     stock_plate.find(plate_id).first(conn)
 }
 

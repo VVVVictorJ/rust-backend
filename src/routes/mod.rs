@@ -2,25 +2,26 @@ use axum::Router;
 
 use crate::app::AppState;
 
-mod root;
-pub mod stock;
-mod stock_request;
-mod stock_snapshot;
-mod profit_analysis;
-mod stock_request_stock;
+mod ai_analysis;
+mod basic_data_analysis;
+mod convertible_bond_query;
 mod daily_kline;
-mod scheduler;
-mod stock_trade_date_query;
-mod stock_track_query;
-mod stock_price_compare;
-mod stock_plate;
-mod stock_table;
-mod stock_plate_stock_table;
 mod dynamic_backtrack;
+mod profit_analysis;
+mod root;
+mod scheduler;
+pub mod stock;
+mod stock_plate;
+mod stock_plate_stock_table;
+mod stock_price_compare;
+mod stock_request;
+mod stock_request_stock;
+mod stock_snapshot;
+mod stock_table;
+mod stock_track_query;
+mod stock_trade_date_query;
 mod stock_watchlist;
 mod stock_watchlist_query;
-mod ai_analysis;
-mod convertible_bond_query;
 
 pub fn build_routes() -> Router<AppState> {
     let api_router = Router::new()
@@ -40,7 +41,8 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/stock-watchlist", stock_watchlist::router())
         .nest("/stock-watchlist-query", stock_watchlist_query::router())
         .nest("/ai-analysis", ai_analysis::router())
-        .nest("/convertible-bond-query", convertible_bond_query::router());
+        .nest("/convertible-bond-query", convertible_bond_query::router())
+        .nest("/basic-data-analysis", basic_data_analysis::router());
 
     Router::new()
         // 根路径与健康检查

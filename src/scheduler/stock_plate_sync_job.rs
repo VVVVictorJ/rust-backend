@@ -13,15 +13,17 @@ use tokio::time::{sleep, Duration};
 use tokio_cron_scheduler::{JobBuilder, JobScheduler};
 
 use crate::app::DbPool;
+use crate::models::stock_tables::StockTable;
 use crate::models::{
     NewJobExecutionHistory, NewStockPlate, NewStockPlateStockTable, UpdateJobExecutionHistory,
     UpdateStockPlate,
 };
-use crate::models::stock_tables::StockTable;
-use crate::repositories::{job_execution_history, stock_plate, stock_plate_stock_table, stock_table};
+use crate::repositories::{
+    job_execution_history, stock_plate, stock_plate_stock_table, stock_table,
+};
 use crate::services::stock_plate_em::fetch_em_plate_list_with_proxy_client;
-use crate::utils::proxy::{shared_proxy_client, ProxyClient};
 use crate::utils::http_client::create_em_client;
+use crate::utils::proxy::{shared_proxy_client, ProxyClient};
 use crate::utils::ws_broadcast::TaskStatusSender;
 
 #[derive(Debug, Serialize)]
@@ -113,7 +115,9 @@ pub async fn create_stock_plate_sync_job(
         .build()?;
 
     scheduler.add(job).await?;
-    tracing::info!("stock_plate 同步定时任务已注册（每天北京时间 18:00 执行，使用 Asia/Shanghai 时区）");
+    tracing::info!(
+        "stock_plate 同步定时任务已注册（每天北京时间 18:00 执行，使用 Asia/Shanghai 时区）"
+    );
     Ok(())
 }
 
@@ -483,8 +487,7 @@ async fn process_stock_once(
                     }
                 };
 
-                let exists =
-                    stock_plate_stock_table::exists_by_ids(&mut conn, plate.id, stock.id)?;
+                let exists = stock_plate_stock_table::exists_by_ids(&mut conn, plate.id, stock.id)?;
                 if !exists {
                     let new_rel = NewStockPlateStockTable {
                         plate_id: plate.id,

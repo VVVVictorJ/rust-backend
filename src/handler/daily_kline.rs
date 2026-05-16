@@ -34,7 +34,10 @@ pub async fn create_daily_kline(
     State(state): State<AppState>,
     Json(payload): Json<CreateDailyKline>,
 ) -> Result<(StatusCode, Json<DailyKlineResponse>), AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let new_rec = NewDailyKline {
         stock_code: payload.stock_code,
         trade_date: payload.trade_date,
@@ -54,7 +57,10 @@ pub async fn get_daily_kline(
     State(state): State<AppState>,
     Path((code, date)): Path<(String, NaiveDate)>,
 ) -> Result<Json<DailyKlineResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let found = daily_kline::find_by_pk(&mut conn, &code, date).map_err(map_err)?;
     Ok(Json(found.into()))
 }
@@ -64,7 +70,10 @@ pub async fn delete_daily_kline(
     State(state): State<AppState>,
     Path((code, date)): Path<(String, NaiveDate)>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let affected = daily_kline::delete_by_pk(&mut conn, &code, date).map_err(map_err)?;
     if affected == 0 {
         return Err(AppError::NotFound);
@@ -78,8 +87,7 @@ pub async fn kline_import(
     Json(payload): Json<ImportKlineRequest>,
 ) -> Result<Json<ImportKlineResponse>, AppError> {
     // 1. 创建 HTTP 客户端
-    let client = http_client::create_em_client()
-        .map_err(|_| AppError::InternalServerError)?;
+    let client = http_client::create_em_client().map_err(|_| AppError::InternalServerError)?;
 
     // 2. 调用 service 层获取并解析数据
     let kline_result = crate::services::kline_service::fetch_and_parse_kline_data(
@@ -108,7 +116,10 @@ pub async fn kline_import(
             Err(e) => {
                 // 区分重复数据和真正的错误
                 match e {
-                    DieselError::DatabaseError(diesel::result::DatabaseErrorKind::UniqueViolation, _) => {
+                    DieselError::DatabaseError(
+                        diesel::result::DatabaseErrorKind::UniqueViolation,
+                        _,
+                    ) => {
                         errors.push(format!(
                             "Duplicate entry for {} on {}",
                             kline_data.stock_code, kline_data.trade_date

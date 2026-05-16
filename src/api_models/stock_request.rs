@@ -18,4 +18,3 @@ pub struct CreateStockRequest {
     pub time_range_start: Option<NaiveDate>,
     pub time_range_end: Option<NaiveDate>,
 }
-

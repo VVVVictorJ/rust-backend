@@ -10,7 +10,9 @@ use crate::handler::stock::FilterParamQuery;
 use crate::models::{NewStockRequest, NewStockSnapshot};
 use crate::repositories::{stock_request, stock_snapshot};
 use crate::routes::stock::internal_error;
-use crate::services::stock_filter::{get_filtered_stocks_param as svc_get_filtered_stocks_param, FilterParams};
+use crate::services::stock_filter::{
+    get_filtered_stocks_param as svc_get_filtered_stocks_param, FilterParams,
+};
 use crate::utils::bigdecimal_parser::parse_bigdecimal;
 
 /// 带数据库持久化的筛选股票接口
@@ -33,7 +35,9 @@ pub async fn get_filtered_stocks_param_with_persist(
 
     // 构建 HTTP 客户端
     let client = {
-        use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_ENCODING, REFERER, USER_AGENT};
+        use reqwest::header::{
+            HeaderMap, HeaderValue, ACCEPT, ACCEPT_ENCODING, REFERER, USER_AGENT,
+        };
         let mut headers = HeaderMap::new();
         headers.insert(
             USER_AGENT,
@@ -41,8 +45,14 @@ pub async fn get_filtered_stocks_param_with_persist(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             ),
         );
-        headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/plain, */*"));
-        headers.insert(REFERER, HeaderValue::from_static("https://quote.eastmoney.com"));
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_static("application/json, text/plain, */*"),
+        );
+        headers.insert(
+            REFERER,
+            HeaderValue::from_static("https://quote.eastmoney.com"),
+        );
         headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
         reqwest::Client::builder()
             .default_headers(headers)
@@ -56,7 +66,8 @@ pub async fn get_filtered_stocks_param_with_persist(
         Err(e) => {
             // 外部 API 请求失败，返回 503 Service Unavailable
             let err_msg = e.to_string();
-            let is_network_error = err_msg.contains("http error") || err_msg.contains("error sending request");
+            let is_network_error =
+                err_msg.contains("http error") || err_msg.contains("error sending request");
             if is_network_error {
                 return Err((
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -86,7 +97,10 @@ pub async fn get_filtered_stocks_param_with_persist(
 }
 
 /// 将筛选结果持久化到数据库
-async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn persist_to_db(
+    state: &AppState,
+    items: &[Value],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut conn = state.db_pool.get()?;
 
     // 1. 插入 stock_requests 记录
@@ -94,7 +108,7 @@ async fn persist_to_db(state: &AppState, items: &[Value]) -> Result<(), Box<dyn 
     let new_request = NewStockRequest {
         strategy_name: Some("filtered_param".to_string()),
         time_range_start: Some(now_date),
-        time_range_end: None,  // 待处理，收益分析完成后才设置
+        time_range_end: None, // 待处理，收益分析完成后才设置
     };
     let created_request = stock_request::create(&mut conn, &new_request)?;
     let request_id = created_request.id;

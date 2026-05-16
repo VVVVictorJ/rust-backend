@@ -8,4 +8,3 @@ pub fn router() -> Router<AppState> {
         .route("/", post(query_by_trade_date))
         .route("/refresh-plates", post(refresh_missing_plates))
 }
-

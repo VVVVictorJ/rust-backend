@@ -1,7 +1,9 @@
 use axum::{routing::post, Router};
 
 use crate::app::AppState;
-use crate::handler::stock_watchlist_query::{query_watchlist_stocks, query_stock_detail, query_stock_kline, fill_watchlist_klines};
+use crate::handler::stock_watchlist_query::{
+    fill_watchlist_klines, query_stock_detail, query_stock_kline, query_watchlist_stocks,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()

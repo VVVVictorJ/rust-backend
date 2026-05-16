@@ -1,4 +1,7 @@
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use crate::app::AppState;
 use crate::handler::scheduler::{
@@ -16,7 +19,10 @@ pub fn router() -> Router<AppState> {
         .route("/trigger-stock-filter", post(trigger_stock_filter))
         .route("/trigger-stock-table-sync", post(trigger_stock_table_sync))
         .route("/trigger-stock-plate-sync", post(trigger_stock_plate_sync))
-        .route("/trigger-watchlist-kline-import", post(trigger_watchlist_kline_import))
+        .route(
+            "/trigger-watchlist-kline-import",
+            post(trigger_watchlist_kline_import),
+        )
         // 查询接口
         .route("/jobs", get(get_job_list))
         .route("/history", get(get_execution_history))
@@ -25,4 +31,3 @@ pub fn router() -> Router<AppState> {
         // WebSocket 路由
         .route("/ws", get(ws_handler::ws_handler))
 }
-

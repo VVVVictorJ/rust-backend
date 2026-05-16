@@ -73,7 +73,9 @@ pub async fn create_stock_table_sync_job(
         .build()?;
 
     scheduler.add(job).await?;
-    tracing::info!("stock_table 同步定时任务已注册（每天北京时间 04:00 执行，使用 Asia/Shanghai 时区）");
+    tracing::info!(
+        "stock_table 同步定时任务已注册（每天北京时间 04:00 执行，使用 Asia/Shanghai 时区）"
+    );
     Ok(())
 }
 

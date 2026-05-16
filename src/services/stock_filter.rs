@@ -56,7 +56,10 @@ impl Default for FilterParams {
     }
 }
 
-pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -> Result<Value, StockFilterError> {
+pub async fn get_filtered_stocks_param(
+    _client: &Client,
+    params: FilterParams,
+) -> Result<Value, StockFilterError> {
     // clamp
     let concurrency = params.concurrency.clamp(1, 64);
     let pz = params.pz.clamp(100, 5000);
@@ -73,7 +76,11 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
     if let Some(diff) = data.get("diff").and_then(|v| v.as_array()) {
         all.extend_from_slice(diff);
     }
-    let pages = if total <= 0 { 1 } else { (total as i32 + pz - 1) / pz };
+    let pages = if total <= 0 {
+        1
+    } else {
+        (total as i32 + pz - 1) / pz
+    };
 
     // fetch rest pages with limited concurrency
     let semaphore = Arc::new(Semaphore::new(concurrency));
@@ -94,7 +101,11 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
     }
     for h in handles {
         if let Ok(Some(v)) = h.await {
-            if let Some(arr) = v.get("data").and_then(|d| d.get("diff")).and_then(|x| x.as_array()) {
+            if let Some(arr) = v
+                .get("data")
+                .and_then(|d| d.get("diff"))
+                .and_then(|x| x.as_array())
+            {
                 all.extend_from_slice(arr);
             }
         }
@@ -108,8 +119,14 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
     let mut col_f10: Vec<Option<f64>> = Vec::with_capacity(all.len());
     let mut col_f8: Vec<Option<f64>> = Vec::with_capacity(all.len());
     for item in &all {
-        let code = item.get("f12").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let name = item.get("f14").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let code = item
+            .get("f12")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let name = item
+            .get("f14")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let f15 = item.get("f15").and_then(|v| v.as_f64());
         let f3_v = match item.get("f3") {
             Some(Value::String(s)) => normalize_percent_scalar(s.as_str()),
@@ -145,7 +162,11 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
 
     let lf = df
         .lazy()
-        .filter(col("f3").gt(params.pct_min).and(col("f3").lt(params.pct_max)))
+        .filter(
+            col("f3")
+                .gt(params.pct_min)
+                .and(col("f3").lt(params.pct_max)),
+        )
         .filter(col("f10").gt(params.lb_min))
         .filter(col("f8").gt(params.hs_min));
     let filtered = lf.collect()?;
@@ -182,25 +203,31 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
                 Err(_) => return None,
             };
             let data = v.get("data")?.clone();
-            let wb = data.get("f191").and_then(|x| {
-                match x {
-                    Value::String(s) => normalize_percent_scalar(s.as_str()),
-                    Value::Number(n) => n.as_f64(),
-                    _ => None,
-                }
+            let wb = data.get("f191").and_then(|x| match x {
+                Value::String(s) => normalize_percent_scalar(s.as_str()),
+                Value::Number(n) => n.as_f64(),
+                _ => None,
             });
             if wb.unwrap_or(f64::MIN) < wb_min {
                 return None;
             }
-            
+
             // 筛选 f137 > 0
             let f137 = data.get("f137").and_then(|x| x.as_f64());
             // if f137.unwrap_or(0.0) <= 0.0 {
             //     return None;
             // }
             let item = FilteredStockItem {
-                f57: data.get("f57").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
-                f58: data.get("f58").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
+                f57: data
+                    .get("f57")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                f58: data
+                    .get("f58")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
                 f43: data.get("f43").and_then(|x| x.as_f64()),
                 f170: data.get("f170").and_then(|x| x.as_f64()),
                 f50: data.get("f50").and_then(|x| x.as_f64()),
@@ -228,7 +255,9 @@ pub async fn get_filtered_stocks_param(_client: &Client, params: FilterParams) -
     Ok(out)
 }
 
-pub async fn get_filtered_stocks_param_with_proxy(params: FilterParams) -> Result<Value, StockFilterError> {
+pub async fn get_filtered_stocks_param_with_proxy(
+    params: FilterParams,
+) -> Result<Value, StockFilterError> {
     let client = Client::new();
     get_filtered_stocks_param(&client, params).await
 }
@@ -241,22 +270,34 @@ fn em_headers() -> HeaderMap {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ),
     );
-    headers.insert(ACCEPT, HeaderValue::from_static("application/json, text/plain, */*"));
-    headers.insert(REFERER, HeaderValue::from_static("https://quote.eastmoney.com"));
+    headers.insert(
+        ACCEPT,
+        HeaderValue::from_static("application/json, text/plain, */*"),
+    );
+    headers.insert(
+        REFERER,
+        HeaderValue::from_static("https://quote.eastmoney.com"),
+    );
     headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
     headers
 }
 
 fn build_list_url(pn: i32, pz: i32) -> Result<Url, StockFilterError> {
     let params = vec![
-        ("fs".to_string(), "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23".to_string()),
+        (
+            "fs".to_string(),
+            "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23".to_string(),
+        ),
         ("fields".to_string(), "f12,f14,f15,f3,f10,f8".to_string()),
         ("fid".to_string(), "f3".to_string()),
         ("po".to_string(), "1".to_string()),
         ("np".to_string(), "1".to_string()),
         ("fltt".to_string(), "2".to_string()),
         ("invt".to_string(), "2".to_string()),
-        ("ut".to_string(), "bd1d9ddb04089700cf9c27f6f7426281".to_string()),
+        (
+            "ut".to_string(),
+            "bd1d9ddb04089700cf9c27f6f7426281".to_string(),
+        ),
         ("pn".to_string(), pn.to_string()),
         ("pz".to_string(), pz.to_string()),
     ];
@@ -267,10 +308,16 @@ fn build_list_url(pn: i32, pz: i32) -> Result<Url, StockFilterError> {
 fn build_detail_url(secid: &str) -> Result<Url, StockFilterError> {
     let params = vec![
         ("secid".to_string(), secid.to_string()),
-        ("fields".to_string(), "f57,f58,f43,f170,f50,f168,f191,f137".to_string()),
+        (
+            "fields".to_string(),
+            "f57,f58,f43,f170,f50,f168,f191,f137".to_string(),
+        ),
         ("fltt".to_string(), "2".to_string()),
         ("invt".to_string(), "2".to_string()),
-        ("ut".to_string(), "bd1d9ddb04089700cf9c27f6f7426281".to_string()),
+        (
+            "ut".to_string(),
+            "bd1d9ddb04089700cf9c27f6f7426281".to_string(),
+        ),
     ];
     Url::parse_with_params(EM_DETAIL_URL, params)
         .map_err(|err| StockFilterError::Url(err.to_string()))

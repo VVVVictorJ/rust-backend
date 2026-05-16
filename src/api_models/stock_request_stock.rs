@@ -11,4 +11,3 @@ pub struct StockRequestStockResponse {
     pub request_id: i32,
     pub stock_code: String,
 }
-

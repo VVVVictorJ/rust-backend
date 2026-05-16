@@ -30,14 +30,16 @@ pub async fn add_to_watchlist(
     State(state): State<AppState>,
     Json(payload): Json<AddWatchlistRequest>,
 ) -> Result<(StatusCode, Json<WatchlistResponse>), AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     // 检查是否已存在
-    let exists = stock_watchlist::exists_by_code(&mut conn, &payload.stock_code)
-        .map_err(|e| {
-            tracing::error!("Failed to check watchlist existence: {}", e);
-            AppError::InternalServerError
-        })?;
+    let exists = stock_watchlist::exists_by_code(&mut conn, &payload.stock_code).map_err(|e| {
+        tracing::error!("Failed to check watchlist existence: {}", e);
+        AppError::InternalServerError
+    })?;
 
     if exists {
         // 如果已存在，返回现有记录
@@ -68,7 +70,10 @@ pub async fn remove_from_watchlist(
     State(state): State<AppState>,
     Path(code): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let affected = stock_watchlist::delete_by_code(&mut conn, &code).map_err(|e| {
         tracing::error!("Failed to delete watchlist item: {}", e);
@@ -87,7 +92,10 @@ pub async fn check_watchlist(
     State(state): State<AppState>,
     Path(code): Path<String>,
 ) -> Result<Json<CheckWatchlistResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let is_watched = stock_watchlist::exists_by_code(&mut conn, &code).map_err(|e| {
         tracing::error!("Failed to check watchlist: {}", e);
@@ -106,7 +114,10 @@ pub async fn batch_check_watchlist(
     State(state): State<AppState>,
     Json(payload): Json<BatchCheckWatchlistRequest>,
 ) -> Result<Json<BatchCheckWatchlistResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let mut watched_codes = Vec::new();
 
@@ -128,7 +139,10 @@ pub async fn batch_check_watchlist(
 pub async fn list_watchlist(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<WatchlistResponse>>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let items = stock_watchlist::list_all(&mut conn).map_err(|e| {
         tracing::error!("Failed to list watchlist: {}", e);

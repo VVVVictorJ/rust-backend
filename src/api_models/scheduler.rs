@@ -59,7 +59,9 @@ impl From<JobExecutionHistory> for JobExecutionHistoryItem {
             job_name: history.job_name,
             status: history.status,
             started_at: history.started_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-            completed_at: history.completed_at.map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string()),
+            completed_at: history
+                .completed_at
+                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string()),
             total_count: history.total_count,
             success_count: history.success_count,
             failed_count: history.failed_count,
@@ -70,4 +72,3 @@ impl From<JobExecutionHistory> for JobExecutionHistoryItem {
         }
     }
 }
-

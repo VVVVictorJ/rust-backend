@@ -8,8 +8,8 @@ use std::str::FromStr;
 use thiserror::Error;
 
 use crate::models::NewDailyKline;
-use crate::utils::secid::code_to_secid;
 use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyError};
+use crate::utils::secid::code_to_secid;
 
 const EM_KLINE_URL: &str = "https://push2his.eastmoney.com/api/qt/stock/kline/get";
 
@@ -65,9 +65,7 @@ pub async fn fetch_eastmoney_kline(
 }
 
 pub fn parse_kline_json(json_data: &Value) -> Result<KlineParseResult, KlineServiceError> {
-    let data = json_data
-        .get("data")
-        .ok_or(KlineServiceError::NoData)?;
+    let data = json_data.get("data").ok_or(KlineServiceError::NoData)?;
 
     let stock_code = data
         .get("code")
@@ -112,24 +110,21 @@ fn parse_single_kline_str(stock_code: &str, kline_str: &str) -> Result<NewDailyK
     let parts: Vec<&str> = kline_str.split(',').collect();
 
     if parts.len() < 7 {
-        return Err(format!("Invalid format, expected at least 7 fields, got {}", parts.len()));
+        return Err(format!(
+            "Invalid format, expected at least 7 fields, got {}",
+            parts.len()
+        ));
     }
 
     let trade_date = NaiveDate::parse_from_str(parts[0], "%Y-%m-%d")
         .map_err(|e| format!("Invalid date '{}': {}", parts[0], e))?;
 
-    let open_price = BigDecimal::from_str(parts[1])
-        .unwrap_or_else(|_| BigDecimal::from(0));
-    let close_price = BigDecimal::from_str(parts[2])
-        .unwrap_or_else(|_| BigDecimal::from(0));
-    let high_price = BigDecimal::from_str(parts[3])
-        .unwrap_or_else(|_| BigDecimal::from(0));
-    let low_price = BigDecimal::from_str(parts[4])
-        .unwrap_or_else(|_| BigDecimal::from(0));
-    let volume = parts[5].parse::<i64>()
-        .unwrap_or(0);
-    let amount = BigDecimal::from_str(parts[6])
-        .unwrap_or_else(|_| BigDecimal::from(0));
+    let open_price = BigDecimal::from_str(parts[1]).unwrap_or_else(|_| BigDecimal::from(0));
+    let close_price = BigDecimal::from_str(parts[2]).unwrap_or_else(|_| BigDecimal::from(0));
+    let high_price = BigDecimal::from_str(parts[3]).unwrap_or_else(|_| BigDecimal::from(0));
+    let low_price = BigDecimal::from_str(parts[4]).unwrap_or_else(|_| BigDecimal::from(0));
+    let volume = parts[5].parse::<i64>().unwrap_or(0);
+    let amount = BigDecimal::from_str(parts[6]).unwrap_or_else(|_| BigDecimal::from(0));
 
     Ok(NewDailyKline {
         stock_code: stock_code.to_string(),
@@ -152,4 +147,3 @@ pub async fn fetch_and_parse_kline_data(
     let json_data = fetch_eastmoney_kline(client, stock_code, start_date, end_date).await?;
     parse_kline_json(&json_data)
 }
-

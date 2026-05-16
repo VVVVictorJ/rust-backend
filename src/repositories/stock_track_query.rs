@@ -1,8 +1,8 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{BigInt, Date, Integer, Numeric, Text, Timestamptz, Nullable, Jsonb};
-use bigdecimal::BigDecimal;
+use diesel::sql_types::{BigInt, Date, Integer, Jsonb, Nullable, Numeric, Text, Timestamptz};
 use serde_json::Value;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;

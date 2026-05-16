@@ -53,4 +53,3 @@ pub struct UpdateJobExecutionHistory {
     pub error_message: Option<String>,
     pub duration_ms: Option<i64>,
 }
-

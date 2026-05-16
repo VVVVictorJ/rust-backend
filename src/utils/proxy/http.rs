@@ -20,7 +20,12 @@ pub async fn proxy_get_json(
             let mut guard = proxy_client.lock().await;
             guard.get_client().await?
         };
-        let resp = match client.get(current_url.clone()).headers(headers.clone()).send().await {
+        let resp = match client
+            .get(current_url.clone())
+            .headers(headers.clone())
+            .send()
+            .await
+        {
             Ok(resp) => resp,
             Err(err) => {
                 let error_debug = format!("{err:?}");

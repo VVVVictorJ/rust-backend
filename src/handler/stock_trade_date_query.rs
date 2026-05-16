@@ -1,18 +1,17 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use chrono::NaiveDate;
 use serde_json;
 
 use crate::api_models::stock_trade_date_query::{
-    PlateInfo, TradeDatePlateRefreshRequest, TradeDatePlateRefreshResponse, TradeDateQueryRequest,
-    TradeDateQueryItem, TradeDateQueryResponse,
+    PlateInfo, TradeDatePlateRefreshRequest, TradeDatePlateRefreshResponse, TradeDateQueryItem,
+    TradeDateQueryRequest, TradeDateQueryResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
 use crate::models::{NewStockPlate, NewStockPlateStockTable, NewStockTable, UpdateStockPlate};
-use crate::repositories::{stock_plate, stock_plate_stock_table, stock_table, stock_trade_date_query};
+use crate::repositories::{
+    stock_plate, stock_plate_stock_table, stock_table, stock_trade_date_query,
+};
 use crate::services::stock_plate_em::fetch_em_plate_list;
 use chrono::Local;
 use reqwest::Client;
@@ -24,15 +23,20 @@ pub async fn query_by_trade_date(
 ) -> Result<Json<TradeDateQueryResponse>, AppError> {
     // 验证分页参数
     if payload.page < 1 {
-        return Err(AppError::BadRequest("page must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "page must be greater than 0".to_string(),
+        ));
     }
     if payload.page_size < 1 || payload.page_size > 100 {
-        return Err(AppError::BadRequest("page_size must be between 1 and 100".to_string()));
+        return Err(AppError::BadRequest(
+            "page_size must be between 1 and 100".to_string(),
+        ));
     }
 
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 获取数据库连接
     let mut conn = state
@@ -44,8 +48,8 @@ pub async fn query_by_trade_date(
     let offset = (payload.page - 1) * payload.page_size;
 
     // 查询总数
-    let total = stock_trade_date_query::count_by_trade_date(&mut conn, trade_date)
-        .map_err(|e| {
+    let total =
+        stock_trade_date_query::count_by_trade_date(&mut conn, trade_date).map_err(|e| {
             tracing::error!("Failed to count records: {}", e);
             AppError::InternalServerError
         })?;
@@ -69,18 +73,18 @@ pub async fn query_by_trade_date(
             let plates: Vec<PlateInfo> = serde_json::from_value(r.plates).unwrap_or_default();
 
             TradeDateQueryItem {
-            stock_code: r.stock_code,
-            stock_name: r.stock_name,
-            latest_price: r.latest_price,
-            close_price: r.close_price,
-            change_pct: r.change_pct,
-            volume_ratio: r.volume_ratio,
-            turnover_rate: r.turnover_rate,
-            bid_ask_ratio: r.bid_ask_ratio,
-            main_force_inflow: r.main_force_inflow,
-            created_at: r.created_at,
-            plates,
-        }
+                stock_code: r.stock_code,
+                stock_name: r.stock_name,
+                latest_price: r.latest_price,
+                close_price: r.close_price,
+                change_pct: r.change_pct,
+                volume_ratio: r.volume_ratio,
+                turnover_rate: r.turnover_rate,
+                bid_ask_ratio: r.bid_ask_ratio,
+                main_force_inflow: r.main_force_inflow,
+                created_at: r.created_at,
+                plates,
+            }
         })
         .collect();
 
@@ -105,19 +109,19 @@ pub async fn refresh_missing_plates(
     State(state): State<AppState>,
     Json(payload): Json<TradeDatePlateRefreshRequest>,
 ) -> Result<Json<TradeDatePlateRefreshResponse>, AppError> {
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     let stocks = {
         let mut conn = state
             .db_pool
             .get()
             .map_err(|_| AppError::InternalServerError)?;
-        stock_trade_date_query::list_stocks_by_trade_date(&mut conn, trade_date)
-            .map_err(|e| {
-                tracing::error!("Failed to list stocks by trade date: {}", e);
-                AppError::InternalServerError
-            })?
+        stock_trade_date_query::list_stocks_by_trade_date(&mut conn, trade_date).map_err(|e| {
+            tracing::error!("Failed to list stocks by trade date: {}", e);
+            AppError::InternalServerError
+        })?
     };
 
     let total_count = stocks.len() as i64;
@@ -165,9 +169,8 @@ pub async fn refresh_missing_plates(
                 .as_ref()
                 .map(|item| item.id)
                 .unwrap_or_default();
-            let relations =
-                stock_plate_stock_table::list_by_stock_table_id(&mut conn, stock_id)
-                    .map_err(|_| AppError::InternalServerError)?;
+            let relations = stock_plate_stock_table::list_by_stock_table_id(&mut conn, stock_id)
+                .map_err(|_| AppError::InternalServerError)?;
             (stock_id, !relations.is_empty())
         };
 
@@ -281,4 +284,3 @@ pub async fn refresh_missing_plates(
         failed_count,
     }))
 }
-

@@ -1,13 +1,13 @@
-use tokio_cron_scheduler::{JobBuilder, JobScheduler};
-use chrono_tz::Asia::Shanghai;
 use crate::app::DbPool;
 use crate::repositories::stock_watchlist;
 use crate::services::kline_service;
 use crate::utils::http_client;
 use chrono::Local;
+use chrono_tz::Asia::Shanghai;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
+use tokio_cron_scheduler::{JobBuilder, JobScheduler};
 
 /// 观察表K线导入任务执行结果
 #[derive(Debug)]
@@ -99,19 +99,23 @@ pub async fn create_watchlist_kline_job(
             })
         }))
         .build()?;
-    
+
     scheduler.add(job).await?;
-    tracing::info!("观察表K线导入定时任务已注册（每天北京时间 16:00 执行，使用 Asia/Shanghai 时区）");
+    tracing::info!(
+        "观察表K线导入定时任务已注册（每天北京时间 16:00 执行，使用 Asia/Shanghai 时区）"
+    );
     Ok(())
 }
 
 /// 执行观察表K线导入任务（可以被定时任务或手动触发调用）
-pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<WatchlistKlineImportResult> {
+pub async fn run_watchlist_kline_task(
+    db_pool: DbPool,
+) -> anyhow::Result<WatchlistKlineImportResult> {
     tracing::info!("开始执行观察表K线导入定时任务");
-    
+
     let start_time = chrono::Local::now().naive_local();
     let mut history_id: Option<i32> = None;
-    
+
     // 记录任务开始
     {
         let mut conn = db_pool.get()?;
@@ -128,7 +132,7 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
             error_message: None,
             duration_ms: None,
         };
-        
+
         match crate::repositories::job_execution_history::create(&mut conn, &new_history) {
             Ok(history) => {
                 history_id = Some(history.id);
@@ -139,22 +143,22 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
             }
         }
     }
-    
+
     // 1. 获取数据库连接
     let mut conn = db_pool.get()?;
-    
+
     // 2. 从观察表获取所有股票代码
     let watchlist_items = stock_watchlist::list_all(&mut conn)?;
     let stock_codes: Vec<String> = watchlist_items
         .into_iter()
         .map(|item| item.stock_code)
         .collect();
-    
+
     tracing::info!("从观察表获取到 {} 个股票代码", stock_codes.len());
-    
+
     if stock_codes.is_empty() {
         tracing::info!("观察表中没有股票，跳过K线导入");
-        
+
         // 更新任务完成状态
         if let Some(id) = history_id {
             let end_time = chrono::Local::now().naive_local();
@@ -175,7 +179,7 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
                 let _ = crate::repositories::job_execution_history::update(c, id, &update);
             }
         }
-        
+
         return Ok(WatchlistKlineImportResult {
             total_stocks: 0,
             success_count: 0,
@@ -184,24 +188,24 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
             stock_details: Vec::new(),
         });
     }
-    
+
     // 3. 创建HTTP客户端
     let client = http_client::create_em_client()?;
-    
+
     // 4. 获取当天日期（格式：YYYYMMDD）
     // 如果是周末，回溯到上一个交易日（周五）
     let today = get_trading_date();
-    
+
     // 5. 并发导入K线数据
     let mut success_count = 0;
     let mut failed_count = 0;
     let mut skipped_count = 0;
     let mut stock_details = Vec::new();
-    
+
     // 解析交易日期用于检查
     let trade_date = chrono::NaiveDate::parse_from_str(&today, "%Y%m%d")
         .map_err(|e| anyhow::anyhow!("日期解析失败: {e}"))?;
-    
+
     let http_semaphore = Arc::new(Semaphore::new(KLINE_HTTP_CONCURRENCY));
     let db_semaphore = Arc::new(Semaphore::new(KLINE_DB_CONCURRENCY));
     let mut join_set = JoinSet::new();
@@ -214,13 +218,7 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
         let db_sem = db_semaphore.clone();
         join_set.spawn(async move {
             process_single_stock_kline(
-                client,
-                stock_code,
-                today,
-                trade_date,
-                pool,
-                http_sem,
-                db_sem,
+                client, stock_code, today, trade_date, pool, http_sem, db_sem,
             )
             .await
         });
@@ -257,7 +255,7 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
             }
         }
     }
-    
+
     tracing::info!(
         "观察表K线导入任务完成，总计: {}, 成功: {}, 失败: {}, 跳过: {}",
         stock_codes.len(),
@@ -265,7 +263,7 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
         failed_count,
         skipped_count
     );
-    
+
     // 更新任务完成状态
     if let Some(id) = history_id {
         let end_time = chrono::Local::now().naive_local();
@@ -279,9 +277,9 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
             } else {
                 "failed"
             };
-            
+
             let details_json = serde_json::to_value(&stock_details).ok();
-            
+
             let update = crate::models::UpdateJobExecutionHistory {
                 status: Some(status.to_string()),
                 completed_at: Some(end_time),
@@ -293,14 +291,14 @@ pub async fn run_watchlist_kline_task(db_pool: DbPool) -> anyhow::Result<Watchli
                 error_message: None,
                 duration_ms: Some(duration),
             };
-            
+
             match crate::repositories::job_execution_history::update(c, id, &update) {
                 Ok(_) => tracing::info!("任务执行记录已更新"),
                 Err(e) => tracing::warn!("更新任务执行记录失败: {}", e),
             }
         }
     }
-    
+
     Ok(WatchlistKlineImportResult {
         total_stocks: stock_codes.len(),
         success_count,
@@ -318,30 +316,26 @@ async fn import_single_stock_kline(
     db_semaphore: Arc<Semaphore>,
 ) -> anyhow::Result<usize> {
     // 1. 从东方财富获取并解析K线数据
-    let kline_result = kline_service::fetch_and_parse_kline_data(
-        client,
-        stock_code,
-        date,
-        date,
-    ).await?;
-    
+    let kline_result =
+        kline_service::fetch_and_parse_kline_data(client, stock_code, date, date).await?;
+
     // 2. 获取数据库连接
     let _db_permit = db_semaphore
         .acquire_owned()
         .await
         .map_err(|_| anyhow::anyhow!("DB 并发限流器已关闭"))?;
     let mut conn = db_pool.get()?;
-    
+
     // 3. 批量插入数据库
     let mut imported_count = 0;
     use crate::repositories::daily_kline;
-    
+
     for kline_data in kline_result.parsed {
         match daily_kline::create(&mut conn, &kline_data) {
             Ok(_) => imported_count += 1,
             Err(diesel::result::Error::DatabaseError(
                 diesel::result::DatabaseErrorKind::UniqueViolation,
-                _
+                _,
             )) => {
                 // 重复数据，忽略
             }
@@ -350,7 +344,7 @@ async fn import_single_stock_kline(
             }
         }
     }
-    
+
     Ok(imported_count)
 }
 
@@ -441,15 +435,15 @@ async fn process_single_stock_kline(
 /// 获取交易日期：如果是周末则返回上周五，否则返回当天
 fn get_trading_date() -> String {
     use chrono::{Datelike, Duration, Weekday};
-    
+
     let now = Local::now();
     let weekday = now.weekday();
-    
+
     let trading_date = match weekday {
         Weekday::Sat => now - Duration::days(1), // 周六 -> 上周五
         Weekday::Sun => now - Duration::days(2), // 周日 -> 上周五
-        _ => now, // 工作日使用当天
+        _ => now,                                // 工作日使用当天
     };
-    
+
     trading_date.format("%Y%m%d").to_string()
 }

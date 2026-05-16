@@ -11,9 +11,7 @@ impl ServerConfig {
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(8001);
-        let addr: SocketAddr = format!("{host}:{port}")
-            .parse()
-            .expect("Invalid HOST/PORT");
+        let addr: SocketAddr = format!("{host}:{port}").parse().expect("Invalid HOST/PORT");
         Self { addr }
     }
 }

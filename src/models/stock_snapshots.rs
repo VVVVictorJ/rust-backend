@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
-use bigdecimal::BigDecimal;
 
 use crate::schema::stock_snapshots;
 
@@ -33,4 +33,3 @@ pub struct NewStockSnapshot {
     pub bid_ask_ratio: BigDecimal,
     pub main_force_inflow: BigDecimal,
 }
-

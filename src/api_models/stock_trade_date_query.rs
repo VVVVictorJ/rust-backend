@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 /// 板块信息
 #[derive(Debug, Deserialize, Serialize)]
@@ -79,4 +79,3 @@ pub struct TradeDatePlateRefreshResponse {
     pub relation_inserted: i64,
     pub failed_count: i64,
 }
-

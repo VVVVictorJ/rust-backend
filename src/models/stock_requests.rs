@@ -1,7 +1,7 @@
+use crate::schema::stock_requests;
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use uuid::Uuid;
-use crate::schema::stock_requests;
 
 #[derive(Queryable, Debug, Clone)]
 pub struct StockRequest {
@@ -20,4 +20,3 @@ pub struct NewStockRequest {
     pub time_range_start: Option<NaiveDate>,
     pub time_range_end: Option<NaiveDate>,
 }
-

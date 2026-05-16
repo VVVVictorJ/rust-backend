@@ -1,13 +1,10 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use chrono::NaiveDate;
 use serde_json;
 
 use crate::api_models::dynamic_backtrack::{
-    DynamicBacktrackRequest, DynamicBacktrackItem, DynamicBacktrackResponse,
-    DynamicBacktrackDetailRequest, TrackDetailItem, TrackDetailResponse,
+    DynamicBacktrackDetailRequest, DynamicBacktrackItem, DynamicBacktrackRequest,
+    DynamicBacktrackResponse, TrackDetailItem, TrackDetailResponse,
 };
 use crate::api_models::stock_trade_date_query::PlateInfo;
 use crate::app::AppState;
@@ -20,17 +17,22 @@ pub async fn query_dynamic_backtrack(
     Json(payload): Json<DynamicBacktrackRequest>,
 ) -> Result<Json<DynamicBacktrackResponse>, AppError> {
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 验证交易日数参数
     if payload.trade_days < 1 {
-        return Err(AppError::BadRequest("trade_days must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "trade_days must be greater than 0".to_string(),
+        ));
     }
 
     // 验证最少出现次数参数
     if payload.min_occurrences < 1 {
-        return Err(AppError::BadRequest("min_occurrences must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "min_occurrences must be greater than 0".to_string(),
+        ));
     }
 
     // 获取数据库连接
@@ -85,12 +87,15 @@ pub async fn query_dynamic_backtrack_detail(
     Json(payload): Json<DynamicBacktrackDetailRequest>,
 ) -> Result<Json<TrackDetailResponse>, AppError> {
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 验证交易日数参数
     if payload.trade_days < 1 {
-        return Err(AppError::BadRequest("trade_days must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "trade_days must be greater than 0".to_string(),
+        ));
     }
 
     // 验证股票代码

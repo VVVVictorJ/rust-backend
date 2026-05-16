@@ -1,4 +1,7 @@
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use crate::app::AppState;
 use crate::handler::stock_table::{
@@ -10,6 +13,8 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_stock_table).get(list_stock_tables))
         .route(
             "/:id",
-            get(get_stock_table).put(update_stock_table).delete(delete_stock_table),
+            get(get_stock_table)
+                .put(update_stock_table)
+                .delete(delete_stock_table),
         )
 }

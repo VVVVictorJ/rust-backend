@@ -2,13 +2,18 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 
-use crate::models::ai_trend_analysis::{AiTrendAnalysis, NewAiTrendAnalysis, UpdateAiTrendAnalysis};
+use crate::models::ai_trend_analysis::{
+    AiTrendAnalysis, NewAiTrendAnalysis, UpdateAiTrendAnalysis,
+};
 use crate::schema::ai_trend_analysis::dsl::*;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// 创建分析记录
-pub fn create(conn: &mut PgPoolConn, new_item: &NewAiTrendAnalysis) -> Result<AiTrendAnalysis, diesel::result::Error> {
+pub fn create(
+    conn: &mut PgPoolConn,
+    new_item: &NewAiTrendAnalysis,
+) -> Result<AiTrendAnalysis, diesel::result::Error> {
     diesel::insert_into(ai_trend_analysis)
         .values(new_item)
         .get_result(conn)
@@ -26,7 +31,10 @@ pub fn update_by_id(
 }
 
 /// 根据ID查询分析记录
-pub fn find_by_id(conn: &mut PgPoolConn, record_id: i32) -> Result<Option<AiTrendAnalysis>, diesel::result::Error> {
+pub fn find_by_id(
+    conn: &mut PgPoolConn,
+    record_id: i32,
+) -> Result<Option<AiTrendAnalysis>, diesel::result::Error> {
     use diesel::OptionalExtension;
     ai_trend_analysis
         .filter(id.eq(record_id))

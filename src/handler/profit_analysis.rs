@@ -28,7 +28,10 @@ pub async fn get_profit_analysis(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ProfitAnalysisResponse>, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let found = profit_analysis::find_by_id(&mut conn, id).map_err(map_err)?;
     Ok(Json(found.into()))
 }
@@ -42,7 +45,10 @@ pub async fn create_profit_analysis(
     State(state): State<AppState>,
     Json(payload): Json<CreateProfitAnalysis>,
 ) -> Result<(StatusCode, Json<InsertResponse>), AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let new_rec = NewProfitAnalysis {
         snapshot_id: payload.snapshot_id,
         strategy_name: payload.strategy_name,
@@ -56,7 +62,10 @@ pub async fn delete_profit_analysis(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let affected = profit_analysis::delete_by_id(&mut conn, id).map_err(map_err)?;
     if affected == 0 {
         return Err(AppError::NotFound);
@@ -70,4 +79,3 @@ fn map_err(err: DieselError) -> AppError {
         _ => AppError::InternalServerError,
     }
 }
-

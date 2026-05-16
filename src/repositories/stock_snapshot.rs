@@ -1,8 +1,8 @@
+use chrono::{DateTime, FixedOffset, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sql_types::Text;
-use chrono::{DateTime, FixedOffset, Utc};
 
 use crate::models::{NewStockSnapshot, StockSnapshot};
 use crate::schema::stock_snapshots::dsl::{
@@ -11,15 +11,24 @@ use crate::schema::stock_snapshots::dsl::{
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
-pub fn find_by_id(conn: &mut PgPoolConn, snapshot_id: i32) -> Result<StockSnapshot, diesel::result::Error> {
+pub fn find_by_id(
+    conn: &mut PgPoolConn,
+    snapshot_id: i32,
+) -> Result<StockSnapshot, diesel::result::Error> {
     stock_snapshots.find(snapshot_id).first(conn)
 }
 
-pub fn delete_by_id(conn: &mut PgPoolConn, snapshot_id: i32) -> Result<usize, diesel::result::Error> {
+pub fn delete_by_id(
+    conn: &mut PgPoolConn,
+    snapshot_id: i32,
+) -> Result<usize, diesel::result::Error> {
     diesel::delete(stock_snapshots.find(snapshot_id)).execute(conn)
 }
 
-pub fn create(conn: &mut PgPoolConn, new_rec: &NewStockSnapshot) -> Result<i32, diesel::result::Error> {
+pub fn create(
+    conn: &mut PgPoolConn,
+    new_rec: &NewStockSnapshot,
+) -> Result<i32, diesel::result::Error> {
     diesel::insert_into(stock_snapshots)
         .values(new_rec)
         .returning(id)
@@ -27,7 +36,10 @@ pub fn create(conn: &mut PgPoolConn, new_rec: &NewStockSnapshot) -> Result<i32, 
 }
 
 /// 根据 request_id 获取所有快照
-pub fn find_by_request_id(conn: &mut PgPoolConn, req_id: i32) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
+pub fn find_by_request_id(
+    conn: &mut PgPoolConn,
+    req_id: i32,
+) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
     stock_snapshots
         .filter(request_id.eq(req_id))
         .load::<StockSnapshot>(conn)
@@ -35,29 +47,32 @@ pub fn find_by_request_id(conn: &mut PgPoolConn, req_id: i32) -> Result<Vec<Stoc
 
 /// 获取昨日（UTC+8 时区）创建的快照，根据 request_ids 过滤
 #[allow(dead_code)]
-pub fn find_yesterday_snapshots(conn: &mut PgPoolConn, request_ids: &[i32]) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
+pub fn find_yesterday_snapshots(
+    conn: &mut PgPoolConn,
+    request_ids: &[i32],
+) -> Result<Vec<StockSnapshot>, diesel::result::Error> {
     if request_ids.is_empty() {
         return Ok(Vec::new());
     }
-    
+
     // 使用 UTC+8 时区（东八区，北京时间）
     let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
     let now_local = Utc::now().with_timezone(&utc_plus_8);
-    
+
     // 获取昨天的日期范围
     let yesterday = now_local.date_naive() - chrono::Days::new(1);
     let yesterday_start_local = yesterday.and_hms_opt(0, 0, 0).unwrap();
     let yesterday_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
         yesterday_start_local - chrono::Duration::hours(8),
-        Utc
+        Utc,
     );
-    
+
     let today_start_local = now_local.date_naive().and_hms_opt(0, 0, 0).unwrap();
     let today_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
         today_start_local - chrono::Duration::hours(8),
-        Utc
+        Utc,
     );
-    
+
     stock_snapshots
         .filter(request_id.eq_any(request_ids))
         .filter(created_at.ge(yesterday_start_utc))
@@ -66,25 +81,29 @@ pub fn find_yesterday_snapshots(conn: &mut PgPoolConn, request_ids: &[i32]) -> R
 }
 
 /// 查询当天（UTC+8 时区）创建的所有不重复股票代码
-pub fn get_distinct_codes_today(conn: &mut PgPoolConn) -> Result<Vec<String>, diesel::result::Error> {
+pub fn get_distinct_codes_today(
+    conn: &mut PgPoolConn,
+) -> Result<Vec<String>, diesel::result::Error> {
     // 使用 UTC+8 时区（东八区，北京时间）
     let utc_plus_8 = FixedOffset::east_opt(8 * 3600).unwrap();
     let now_local = Utc::now().with_timezone(&utc_plus_8);
-    
+
     // 获取当地时间的当天 00:00:00
     let today_start_local = now_local.date_naive().and_hms_opt(0, 0, 0).unwrap();
     let today_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
         today_start_local - chrono::Duration::hours(8),
-        Utc
+        Utc,
     );
-    
+
     // 获取当地时间的明天 00:00:00
-    let tomorrow_start_local = (now_local.date_naive() + chrono::Days::new(1)).and_hms_opt(0, 0, 0).unwrap();
+    let tomorrow_start_local = (now_local.date_naive() + chrono::Days::new(1))
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
     let tomorrow_start_utc: DateTime<Utc> = DateTime::<Utc>::from_naive_utc_and_offset(
         tomorrow_start_local - chrono::Duration::hours(8),
-        Utc
+        Utc,
     );
-    
+
     stock_snapshots
         .select(stock_code_col)
         .filter(created_at.ge(today_start_utc))
@@ -102,7 +121,9 @@ pub struct StockCodeName {
 }
 
 /// 获取去重后的 stock_code + stock_name（按 created_at 倒序取最新）
-pub fn list_distinct_codes_with_name(conn: &mut PgPoolConn) -> Result<Vec<StockCodeName>, diesel::result::Error> {
+pub fn list_distinct_codes_with_name(
+    conn: &mut PgPoolConn,
+) -> Result<Vec<StockCodeName>, diesel::result::Error> {
     let query = r#"
         SELECT DISTINCT ON (stock_code)
             stock_code,
@@ -113,4 +134,3 @@ pub fn list_distinct_codes_with_name(conn: &mut PgPoolConn) -> Result<Vec<StockC
 
     diesel::sql_query(query).load::<StockCodeName>(conn)
 }
-

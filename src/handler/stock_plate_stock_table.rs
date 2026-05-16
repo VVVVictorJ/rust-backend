@@ -6,7 +6,8 @@ use axum::{
 use diesel::result::Error as DieselError;
 
 use crate::api_models::stock_plate_stock_table::{
-    CreateStockPlateStockTable, StockPlateStockItem, StockPlateStockQuery, StockPlateStockQueryResponse,
+    CreateStockPlateStockTable, StockPlateStockItem, StockPlateStockQuery,
+    StockPlateStockQueryResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
@@ -17,7 +18,10 @@ pub async fn create_stock_plate_stock_table(
     State(state): State<AppState>,
     Json(payload): Json<CreateStockPlateStockTable>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let new_rel = NewStockPlateStockTable {
         plate_id: payload.plate_id,
         stock_table_id: payload.stock_table_id,
@@ -31,10 +35,14 @@ pub async fn query_stock_plate_stocks(
     Query(params): Query<StockPlateStockQuery>,
 ) -> Result<Json<StockPlateStockQueryResponse>, AppError> {
     if params.page < 1 {
-        return Err(AppError::BadRequest("page must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "page must be greater than 0".to_string(),
+        ));
     }
     if params.page_size < 1 || params.page_size > 100 {
-        return Err(AppError::BadRequest("page_size must be between 1 and 100".to_string()));
+        return Err(AppError::BadRequest(
+            "page_size must be between 1 and 100".to_string(),
+        ));
     }
 
     let plate_name_filter = params
@@ -44,7 +52,10 @@ pub async fn query_stock_plate_stocks(
         .filter(|name| !name.is_empty());
 
     let offset = (params.page - 1) * params.page_size;
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
 
     let total = stock_plate_stock_table::count_plate_stocks(&mut conn, plate_name_filter)
         .map_err(|_| AppError::InternalServerError)?;
@@ -87,7 +98,10 @@ pub async fn delete_stock_plate_stock_table(
     State(state): State<AppState>,
     Path((plate_id, stock_table_id)): Path<(i32, i32)>,
 ) -> Result<StatusCode, AppError> {
-    let mut conn = state.db_pool.get().map_err(|_| AppError::InternalServerError)?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
     let affected = stock_plate_stock_table::delete_by_pk(&mut conn, plate_id, stock_table_id)
         .map_err(map_err)?;
     if affected == 0 {

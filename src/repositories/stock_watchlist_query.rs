@@ -1,8 +1,8 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{BigInt, Date, Numeric, Text, Timestamptz, Nullable, Jsonb};
-use bigdecimal::BigDecimal;
+use diesel::sql_types::{BigInt, Date, Jsonb, Nullable, Numeric, Text, Timestamptz};
 use serde_json::Value;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
@@ -104,7 +104,10 @@ pub fn query_watchlist_stocks(
 
     // 板块筛选
     if !plate_codes.is_empty() {
-        let plate_list: Vec<String> = plate_codes.iter().map(|c| format!("'{}'", c.replace("'", "''"))).collect();
+        let plate_list: Vec<String> = plate_codes
+            .iter()
+            .map(|c| format!("'{}'", c.replace("'", "''")))
+            .collect();
         where_conditions.push(format!("sp.plate_code IN ({})", plate_list.join(",")));
     }
 
@@ -142,7 +145,10 @@ pub fn query_watchlist_stocks(
 
     // 股票代码模糊匹配
     if let Some(filter) = stock_code_filter {
-        let escaped = filter.replace("'", "''").replace("%", "\\%").replace("_", "\\_");
+        let escaped = filter
+            .replace("'", "''")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
         where_conditions.push(format!("ls.stock_code LIKE '%{escaped}%'"));
     }
 
@@ -342,11 +348,9 @@ pub fn find_snapshot_date_range(
         .get_result::<DateRangeResult>(conn)
         .optional()
         .map(|opt| {
-            opt.and_then(|r| {
-                match (r.min_date, r.max_date) {
-                    (Some(min), Some(max)) => Some((min, max)),
-                    _ => None,
-                }
+            opt.and_then(|r| match (r.min_date, r.max_date) {
+                (Some(min), Some(max)) => Some((min, max)),
+                _ => None,
             })
         })
 }

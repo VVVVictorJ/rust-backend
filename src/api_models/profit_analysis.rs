@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 #[derive(Debug, Serialize)]
 pub struct ProfitAnalysisResponse {
@@ -17,4 +17,3 @@ pub struct CreateProfitAnalysis {
     pub strategy_name: String,
     pub profit_rate: BigDecimal,
 }
-

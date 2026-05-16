@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 use super::stock_trade_date_query::PlateInfo;
 
@@ -56,4 +56,3 @@ pub struct DynamicBacktrackDetailRequest {
 
 /// 动态回溯明细查询响应（复用 TrackDetailResponse）
 pub use super::stock_track_query::{TrackDetailItem, TrackDetailResponse};
-

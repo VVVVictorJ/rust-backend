@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::str::FromStr;
 
 /// 将 JSON Value 解析为 BigDecimal
-/// 
+///
 /// 支持的输入类型：
 /// - Number: 转换为 f64 后再转为 BigDecimal
 /// - String: 直接解析字符串为 BigDecimal
@@ -21,4 +21,3 @@ pub fn parse_bigdecimal(v: Option<&Value>) -> BigDecimal {
         _ => BigDecimal::from(0),
     }
 }
-

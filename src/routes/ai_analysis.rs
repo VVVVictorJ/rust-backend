@@ -1,7 +1,10 @@
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use crate::app::AppState;
-use crate::handler::ai_analysis::{trend_prediction, trend_history, trend_detail};
+use crate::handler::ai_analysis::{trend_detail, trend_history, trend_prediction};
 
 pub fn router() -> Router<AppState> {
     Router::new()

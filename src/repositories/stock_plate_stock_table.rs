@@ -144,8 +144,7 @@ pub fn count_plate_stocks(
             JOIN stock_table s ON rel.stock_table_id = s.id
         "#;
 
-        let result = diesel::sql_query(query)
-            .get_result::<CountResult>(conn)?;
+        let result = diesel::sql_query(query).get_result::<CountResult>(conn)?;
         Ok(result.count)
     }
 }

@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use diesel::prelude::*;
-use bigdecimal::BigDecimal;
 
 use crate::schema::daily_klines;
 
@@ -28,4 +28,3 @@ pub struct NewDailyKline {
     pub volume: i64,
     pub amount: BigDecimal,
 }
-

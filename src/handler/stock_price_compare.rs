@@ -1,11 +1,8 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use chrono::NaiveDate;
 
 use crate::api_models::stock_price_compare::{
-    PriceCompareRequest, PriceCompareItem, PriceCompareResponse,
+    PriceCompareItem, PriceCompareRequest, PriceCompareResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
@@ -18,15 +15,20 @@ pub async fn query_price_compare(
 ) -> Result<Json<PriceCompareResponse>, AppError> {
     // 验证分页参数
     if payload.page < 1 {
-        return Err(AppError::BadRequest("page must be greater than 0".to_string()));
+        return Err(AppError::BadRequest(
+            "page must be greater than 0".to_string(),
+        ));
     }
     if payload.page_size < 1 || payload.page_size > 100 {
-        return Err(AppError::BadRequest("page_size must be between 1 and 100".to_string()));
+        return Err(AppError::BadRequest(
+            "page_size must be between 1 and 100".to_string(),
+        ));
     }
 
     // 解析交易日期
-    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d")
-        .map_err(|_| AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string()))?;
+    let trade_date = NaiveDate::parse_from_str(&payload.trade_date, "%Y-%m-%d").map_err(|_| {
+        AppError::BadRequest("Invalid date format, expected YYYY-MM-DD".to_string())
+    })?;
 
     // 获取数据库连接
     let mut conn = state
@@ -35,8 +37,8 @@ pub async fn query_price_compare(
         .map_err(|_| AppError::InternalServerError)?;
 
     // 查询前一个交易日（处理节假日）
-    let snapshot_date = daily_kline::find_previous_trade_date(&mut conn, trade_date)
-        .map_err(|e| {
+    let snapshot_date =
+        daily_kline::find_previous_trade_date(&mut conn, trade_date).map_err(|e| {
             tracing::error!("Failed to find previous trade date: {}", e);
             AppError::InternalServerError
         })?;
@@ -112,4 +114,3 @@ pub async fn query_price_compare(
         trade_date: Some(trade_date),
     }))
 }
-

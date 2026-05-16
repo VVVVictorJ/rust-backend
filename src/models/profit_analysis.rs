@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
-use bigdecimal::BigDecimal;
 
 use crate::schema::profit_analysis;
 
@@ -21,4 +21,3 @@ pub struct NewProfitAnalysis {
     pub strategy_name: String,
     pub profit_rate: BigDecimal,
 }
-

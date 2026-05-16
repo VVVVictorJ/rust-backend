@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateDailyKline {
@@ -25,4 +25,3 @@ pub struct DailyKlineResponse {
     pub volume: i64,
     pub amount: BigDecimal,
 }
-

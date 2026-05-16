@@ -1,4 +1,7 @@
-use axum::{routing::{get, post}, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 
 use crate::app::AppState;
 use crate::handler::stock_plate::{
@@ -12,6 +15,8 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_stock_plate).get(list_stock_plates))
         .route(
             "/:id",
-            get(get_stock_plate).put(update_stock_plate).delete(delete_stock_plate),
+            get(get_stock_plate)
+                .put(update_stock_plate)
+                .delete(delete_stock_plate),
         )
 }

@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 #[derive(Debug, Serialize)]
 pub struct StockSnapshotResponse {
@@ -35,4 +35,3 @@ pub struct TodayStockCodesResponse {
     pub count: usize,
     pub stock_codes: Vec<String>,
 }
-

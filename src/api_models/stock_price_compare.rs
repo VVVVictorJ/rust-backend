@@ -1,6 +1,6 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use bigdecimal::BigDecimal;
 
 /// 价格对比查询请求
 #[derive(Debug, Deserialize)]
@@ -55,4 +55,3 @@ pub struct PriceCompareResponse {
     /// 查询的交易日期
     pub trade_date: Option<NaiveDate>,
 }
-

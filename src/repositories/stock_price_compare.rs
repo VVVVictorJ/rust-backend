@@ -1,8 +1,8 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sql_types::{BigInt, Date, Numeric, Text, Timestamptz};
-use bigdecimal::BigDecimal;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
@@ -115,4 +115,3 @@ pub fn count_price_compare(
 
     Ok(result.count)
 }
-
