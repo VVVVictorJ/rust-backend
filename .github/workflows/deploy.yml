@@ -14,6 +14,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_sha: ${{ steps.meta.outputs.sha }}
+      use_subdir: ${{ steps.df.outputs.use_subdir }}
     permissions:
       contents: read
     steps:
@@ -116,16 +119,22 @@ jobs:
           fi
       - name: Deploy via SSH
         if: ${{ steps.sshcred.outputs.has == 'true' }}
+        env:
+          IMAGE_SHA: ${{ needs.build-and-push.outputs.image_sha }}
+          DEPLOY_USE_SUBDIR: ${{ needs.build-and-push.outputs.use_subdir }}
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
-          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA
+          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA,IMAGE_SHA,DEPLOY_USE_SUBDIR
           script: |
             set -euxo pipefail
             HUB_REF="${BACKEND_IMAGE}:latest"
+            SHORT_SHA="$(printf '%s' "${GITHUB_SHA}" | cut -c1-7)"
+            SHA_TAG="${IMAGE_SHA:-${SHORT_SHA}}"
+            TAG_REF="${BACKEND_IMAGE}:${SHA_TAG}"
             if [ ! -d "${{ secrets.DEPLOY_PATH }}" ]; then
               mkdir -p "${{ secrets.DEPLOY_PATH }}"
             fi
@@ -143,15 +152,30 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
-            # 使用 registry 上的 latest 标签（与 CI push 一致）；出站不稳时退避重试
+            # 优先拉 CI 推送的短 SHA 标签，再 tag 成 latest（与 Docker Hub digest 对齐）；失败再拉 latest
             pulled=0
             for attempt in 1 2 3 4 5; do
-              if docker pull "${HUB_REF}"; then
+              if docker pull "${TAG_REF}"; then
+                docker tag "${TAG_REF}" "${HUB_REF}"
                 pulled=1
                 break
               fi
               sleep $((attempt * 8))
             done
+
+            if [ "${pulled}" -ne 1 ]; then
+              echo "WARN: 拉取 ${TAG_REF} 失败，回退 docker pull latest" >&2
+              pulled=0
+              for attempt in 1 2 3 4 5; do
+                if docker pull "${HUB_REF}"; then
+                  pulled=1
+                  break
+                fi
+                sleep $((attempt * 8))
+              fi
+            fi
+
+            docker image inspect "${HUB_REF}" --format 'deployed RepoDigests={{json .RepoDigests}} ImageID={{.Id}}' || true
 
             if [ "${pulled}" -ne 1 ]; then
               BUILD_DIR="/tmp/rust-backend-${GITHUB_SHA}"
@@ -166,15 +190,20 @@ jobs:
                 sleep $((attempt * 15))
               done
               if [ "${cloned}" -ne 1 ]; then
-                echo "ERROR: docker pull latest 与 git clone 重试均失败" >&2
+                echo "ERROR: docker pull SHA/latest 与 git clone 重试均失败" >&2
                 exit 1
               fi
               cd "${BUILD_DIR}"
               git checkout "${GITHUB_SHA}"
-              docker build --platform linux/amd64 -t "${BACKEND_IMAGE}:latest" .
+              if [ "${DEPLOY_USE_SUBDIR}" = "true" ]; then
+                docker build --platform linux/amd64 -t "${BACKEND_IMAGE}:latest" -f rust-backend/Dockerfile rust-backend
+              else
+                docker build --platform linux/amd64 -t "${BACKEND_IMAGE}:latest" .
+              fi
               cd "${{ secrets.DEPLOY_PATH }}"
             fi
-            # 强制移除旧容器，确保新镜像生效
+            # 与 compose 声明再次对齐，强制用刚拉取的镜像重启
+            docker compose pull backend || true
             docker compose rm -sf backend || true
             docker compose up -d --no-deps --force-recreate backend
             docker image prune -f
