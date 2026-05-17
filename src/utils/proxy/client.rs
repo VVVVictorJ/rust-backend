@@ -108,7 +108,6 @@ impl ProxyClient {
         self.request_with_proxy(Method::GET, url, None, None).await
     }
 
-    #[allow(dead_code)]
     pub async fn request_with_proxy(
         &mut self,
         method: Method,

@@ -1,26 +1,113 @@
-use anyhow::{anyhow, Result};
-use chrono::{Datelike, Local, NaiveDate, NaiveDateTime};
+use rand::Rng;
+use reqwest::header::HeaderMap;
+use reqwest::{Client, Url};
 use serde_json::Value;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
+
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime};
 
 use crate::api_models::convertible_bond_query::ConvertibleBondItem;
+use crate::utils::proxy::{proxy_get_json, shared_proxy_client, ProxyClient, ProxyError};
 
-const CONVERTIBLE_BOND_URL: &str = "https://datacenter-web.eastmoney.com/api/data/v1/get?sortColumns=PUBLIC_START_DATE,SECURITY_CODE&sortTypes=-1,-1&pageSize=500&pageNumber=1&reportName=RPT_BOND_CB_LIST&columns=ALL&quoteColumns=f2~01~CONVERT_STOCK_CODE~CONVERT_STOCK_PRICE,f235~10~SECURITY_CODE~TRANSFER_PRICE,f236~10~SECURITY_CODE~TRANSFER_VALUE,f2~10~SECURITY_CODE~CURRENT_BOND_PRICE,f237~10~SECURITY_CODE~TRANSFER_PREMIUM_RATIO,f239~10~SECURITY_CODE~RESALE_TRIG_PRICE,f240~10~SECURITY_CODE~REDEEM_TRIG_PRICE,f23~01~CONVERT_STOCK_CODE~PBV_RATIO&quoteType=0&source=WEB&client=WEB";
+/// 数据中心可转债列表 GET 路径（与东方财富 WEB 客户端一致）。
+const EM_CB_DATACENTER_GET: &str = "https://datacenter-web.eastmoney.com/api/data/v1/get";
 
-pub async fn fetch_filtered_convertible_bonds() -> Result<Vec<ConvertibleBondItem>> {
-    let text = reqwest::Client::new()
-        .get(CONVERTIBLE_BOND_URL)
-        .send()
-        .await?
-        .text()
-        .await?;
+#[derive(Debug, Error)]
+pub enum ConvertibleBondError {
+    #[error("proxy error: {0}")]
+    Proxy(#[from] ProxyError),
+    #[error("missing result.data")]
+    MissingResultData,
+    #[error("url parse error: {0}")]
+    Url(String),
+}
 
-    let payload = extract_json_payload(&text).ok_or_else(|| anyhow!("invalid jsonp payload"))?;
-    let root: Value = serde_json::from_str(payload)?;
-    let rows = root
-        .pointer("/result/data")
-        .and_then(Value::as_array)
-        .ok_or_else(|| anyhow!("result.data is missing"))?;
+fn build_convertible_list_url(page_number: &str, page_size: &str) -> Result<Url, ConvertibleBondError> {
+    let sort_columns = "PUBLIC_START_DATE,SECURITY_CODE";
+    let sort_types = "-1,-1";
+    let report_name = "RPT_BOND_CB_LIST";
+    let columns = "ALL";
+    let quote_columns = "f2~01~CONVERT_STOCK_CODE~CONVERT_STOCK_PRICE,f235~10~SECURITY_CODE~TRANSFER_PRICE,f236~10~SECURITY_CODE~TRANSFER_VALUE,f2~10~SECURITY_CODE~CURRENT_BOND_PRICE,f237~10~SECURITY_CODE~TRANSFER_PREMIUM_RATIO,f239~10~SECURITY_CODE~RESALE_TRIG_PRICE,f240~10~SECURITY_CODE~REDEEM_TRIG_PRICE,f23~01~CONVERT_STOCK_CODE~PBV_RATIO";
+    let quote_type = "0";
+    let source = "WEB";
+    let query_client = "WEB";
 
+    Url::parse_with_params(
+        EM_CB_DATACENTER_GET,
+        [
+            ("sortColumns", sort_columns),
+            ("sortTypes", sort_types),
+            ("pageSize", page_size),
+            ("pageNumber", page_number),
+            ("reportName", report_name),
+            ("columns", columns),
+            ("quoteColumns", quote_columns),
+            ("quoteType", quote_type),
+            ("source", source),
+            ("client", query_client),
+        ],
+    )
+    .map_err(|e| ConvertibleBondError::Url(e.to_string()))
+}
+
+/// 接口返回的总页数；缺省时用 count 与 pageSize 换算。
+fn resolve_total_pages(root: &Value, page_size_str: &str) -> i64 {
+    if let Some(p) = root.pointer("/result/pages").and_then(Value::as_i64) {
+        if p >= 1 {
+            return p;
+        }
+    }
+
+    let count = root
+        .pointer("/result/count")
+        .and_then(Value::as_i64)
+        .unwrap_or(0)
+        .max(0);
+    let ps = page_size_str.parse::<i64>().unwrap_or(500).max(1);
+    ((count + ps - 1) / ps).max(1)
+}
+
+async fn fetch_convertible_page_json(
+    proxy_client: &Arc<Mutex<ProxyClient>>,
+    headers: &HeaderMap,
+    url: Url,
+    page_number_one_based: i64,
+) -> Result<Value, ConvertibleBondError> {
+    let mut attempt = 0;
+    let max_attempts = 3;
+    loop {
+        attempt += 1;
+        match proxy_get_json(proxy_client, url.clone(), headers).await {
+            Ok(json) => return Ok(json),
+            Err(e) => {
+                if attempt < max_attempts {
+                    let backoff = 200_u64.saturating_mul(attempt as u64);
+                    let jitter = rand::thread_rng().gen_range(0..=150);
+                    tracing::warn!(
+                        "可转债数据中心请求失败，准备重试: page={}, error={}, attempt={}",
+                        page_number_one_based,
+                        e,
+                        attempt
+                    );
+                    sleep(Duration::from_millis(backoff + jitter)).await;
+                    continue;
+                }
+                return Err(e.into());
+            }
+        }
+    }
+}
+
+fn append_rows_from_result(all: &mut Vec<Value>, root: &Value) {
+    if let Some(arr) = root.pointer("/result/data").and_then(Value::as_array) {
+        all.extend(arr.iter().cloned());
+    }
+}
+
+fn filter_rows_to_items(rows: &[Value]) -> Vec<ConvertibleBondItem> {
     let mut items = Vec::new();
     let now = Local::now();
     let now_year = now.year();
@@ -71,21 +158,64 @@ pub async fn fetch_filtered_convertible_bonds() -> Result<Vec<ConvertibleBondIte
         });
     }
 
-    Ok(items)
+    items
 }
 
-fn extract_json_payload(raw: &str) -> Option<&str> {
-    let trimmed = raw.trim();
-    if trimmed.starts_with('{') {
-        return Some(trimmed);
+pub async fn fetch_filtered_convertible_bonds(
+    _client: &Client,
+) -> Result<Vec<ConvertibleBondItem>, ConvertibleBondError> {
+    let proxy_client = shared_proxy_client()?;
+
+    fetch_filtered_convertible_bonds_with_proxy_client(proxy_client, _client).await
+}
+
+pub async fn fetch_filtered_convertible_bonds_with_proxy_client(
+    proxy_client: Arc<Mutex<ProxyClient>>,
+    _client: &Client,
+) -> Result<Vec<ConvertibleBondItem>, ConvertibleBondError> {
+    let headers = HeaderMap::new();
+    let page_size = "500";
+
+    let url_first = build_convertible_list_url("1", page_size)?;
+    let root_first =
+        fetch_convertible_page_json(&proxy_client, &headers, url_first, 1).await?;
+
+    root_first
+        .pointer("/result/data")
+        .and_then(Value::as_array)
+        .ok_or(ConvertibleBondError::MissingResultData)?;
+
+    let total_pages = resolve_total_pages(&root_first, page_size);
+    let mut all_rows: Vec<Value> = Vec::new();
+    append_rows_from_result(&mut all_rows, &root_first);
+
+    for pn in 2..=total_pages {
+        let url = build_convertible_list_url(&pn.to_string(), page_size)?;
+        let root =
+            fetch_convertible_page_json(&proxy_client, &headers, url, pn).await?;
+        append_rows_from_result(&mut all_rows, &root);
     }
 
-    let left = trimmed.find('(')?;
-    let right = trimmed.rfind(')')?;
-    if right <= left {
-        return None;
-    }
-    Some(trimmed[left + 1..right].trim())
+    let market_count = root_first
+        .pointer("/result/count")
+        .and_then(Value::as_i64)
+        .unwrap_or(all_rows.len() as i64);
+    let fetched = all_rows.len();
+    let items = filter_rows_to_items(&all_rows);
+    tracing::info!(
+        target: "convertible_bond",
+        market_count,
+        fetched_rows = fetched,
+        matched = items.len(),
+        pages = total_pages,
+        "可转债查询: 数据中心约 {} 支(共 {} 页), 合并拉取 {} 条, 筛选后 {} 支",
+        market_count,
+        total_pages,
+        fetched,
+        items.len()
+    );
+
+    Ok(items)
 }
 
 fn parse_string(value: Option<&Value>) -> String {
