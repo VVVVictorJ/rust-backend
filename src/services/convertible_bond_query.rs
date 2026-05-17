@@ -3,13 +3,11 @@ use chrono::{Datelike, Local, NaiveDate, NaiveDateTime};
 use serde_json::Value;
 
 use crate::api_models::convertible_bond_query::ConvertibleBondItem;
-use crate::utils::http_client::create_em_client;
 
 const CONVERTIBLE_BOND_URL: &str = "https://datacenter-web.eastmoney.com/api/data/v1/get?sortColumns=PUBLIC_START_DATE,SECURITY_CODE&sortTypes=-1,-1&pageSize=500&pageNumber=1&reportName=RPT_BOND_CB_LIST&columns=ALL&quoteColumns=f2~01~CONVERT_STOCK_CODE~CONVERT_STOCK_PRICE,f235~10~SECURITY_CODE~TRANSFER_PRICE,f236~10~SECURITY_CODE~TRANSFER_VALUE,f2~10~SECURITY_CODE~CURRENT_BOND_PRICE,f237~10~SECURITY_CODE~TRANSFER_PREMIUM_RATIO,f239~10~SECURITY_CODE~RESALE_TRIG_PRICE,f240~10~SECURITY_CODE~REDEEM_TRIG_PRICE,f23~01~CONVERT_STOCK_CODE~PBV_RATIO&quoteType=0&source=WEB&client=WEB";
 
 pub async fn fetch_filtered_convertible_bonds() -> Result<Vec<ConvertibleBondItem>> {
-    let client = create_em_client().map_err(|e| anyhow!("create em http client: {e}"))?;
-    let text = client
+    let text = reqwest::Client::new()
         .get(CONVERTIBLE_BOND_URL)
         .send()
         .await?
