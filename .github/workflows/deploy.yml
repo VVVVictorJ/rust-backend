@@ -163,13 +163,18 @@ jobs:
             if [ ! -f ".env" ]; then
               printf 'ALLOWED_ORIGINS=\nHOST=0.0.0.0\nPORT=8000\n' > .env
             fi
-            # 与 CI 同源：远端 pull Docker Hub 需已登录（私有镜像 / 匿名限速会 UNAUTHORIZED）；关闭 xtrace 避免凭据泄漏
+            # 可选：尽力登录 Hub；若机房连 registry-1.docker.io 超时，登录与 pull 同源失败——不得 exit，否则阻断后续 GHCR
             if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
               set +x
-              echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin docker.io || { set -x; echo "ERROR: docker.io 登录失败" >&2; exit 1; }
-              set -x
+              if echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin docker.io; then
+                set -x
+                echo 'INFO: docker.io 登录成功' >&2
+              else
+                set -x
+                echo 'WARN: docker.io 登录失败（常见：连 Hub 超时/网络策略）；将继续优先尝试 GHCR 再试 Hub' >&2
+              fi
             else
-              echo "WARN: 未配置 DOCKERHUB_USERNAME/DOCKERHUB_TOKEN，Hub 匿名拉取可能失败或限速" >&2
+              echo 'WARN: 未配置 DOCKERHUB_USERNAME/DOCKERHUB_TOKEN，Hub 匿名拉取可能失败或限速' >&2
             fi
             # 确保 PostgreSQL 运行并执行数据库迁移
             docker compose up -d postgres
@@ -181,20 +186,11 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
-            # 优先 Docker Hub SHA；腾讯云访问 Hub 易超时则改试 GHCR 同 SHA
+            # Hub 在云厂商侧常被墙/超时：有 GHCR 时先拉 GHCR 同 SHA，再回退 Hub
             pulled=0
-            for attempt in 1 2 3 4 5; do
-              if docker pull "${TAG_REF}"; then
-                docker tag "${TAG_REF}" "${HUB_REF}"
-                pulled=1
-                break
-              fi
-              sleep $((attempt * 8))
-            done
-
-            if [ "${pulled}" -ne 1 ] && [ -n "${GHCR_IMAGE:-}" ]; then
+            if [ -n "${GHCR_IMAGE:-}" ]; then
               GHCR_TAG="${GHCR_IMAGE}:${SHA_TAG}"
-              echo "WARN: Docker Hub 拉取 ${TAG_REF} 失败，尝试 GHCR ${GHCR_TAG}" >&2
+              echo "INFO: 优先尝试 GHCR ${GHCR_TAG}" >&2
               for attempt in 1 2 3 4 5; do
                 if docker pull "${GHCR_TAG}"; then
                   docker tag "${GHCR_TAG}" "${HUB_REF}"
@@ -206,8 +202,23 @@ jobs:
             fi
 
             if [ "${pulled}" -ne 1 ]; then
+              if [ -n "${GHCR_IMAGE:-}" ]; then
+                echo "WARN: GHCR 拉取 SHA 失败，尝试 Docker Hub ${TAG_REF}" >&2
+              else
+                echo "INFO: 尝试 Docker Hub ${TAG_REF}" >&2
+              fi
+              for attempt in 1 2 3 4 5; do
+                if docker pull "${TAG_REF}"; then
+                  docker tag "${TAG_REF}" "${HUB_REF}"
+                  pulled=1
+                  break
+                fi
+                sleep $((attempt * 8))
+              done
+            fi
+
+            if [ "${pulled}" -ne 1 ]; then
               echo "WARN: 拉取 ${TAG_REF} 失败，回退 docker pull ${HUB_REF}" >&2
-              pulled=0
               for attempt in 1 2 3 4 5; do
                 if docker pull "${HUB_REF}"; then
                   pulled=1
@@ -219,7 +230,7 @@ jobs:
 
             if [ "${pulled}" -ne 1 ] && [ -n "${GHCR_IMAGE:-}" ]; then
               GHCR_LATEST="${GHCR_IMAGE}:latest"
-              echo "WARN: Docker Hub latest 失败，尝试 ${GHCR_LATEST}" >&2
+              echo "WARN: Hub latest 失败，尝试 ${GHCR_LATEST}" >&2
               for attempt in 1 2 3 4 5; do
                 if docker pull "${GHCR_LATEST}"; then
                   docker tag "${GHCR_LATEST}" "${HUB_REF}"
