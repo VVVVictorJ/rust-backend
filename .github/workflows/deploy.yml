@@ -141,13 +141,15 @@ jobs:
           IMAGE_SHA: ${{ needs.build-and-push.outputs.image_sha }}
           DEPLOY_USE_SUBDIR: ${{ needs.build-and-push.outputs.use_subdir }}
           GHCR_IMAGE: ${{ needs.build-and-push.outputs.ghcr_image }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
-          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA,IMAGE_SHA,DEPLOY_USE_SUBDIR,GHCR_IMAGE
+          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA,IMAGE_SHA,DEPLOY_USE_SUBDIR,GHCR_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script: |
             set -euxo pipefail
             HUB_REF="${BACKEND_IMAGE}:latest"
@@ -160,6 +162,14 @@ jobs:
             cd "${{ secrets.DEPLOY_PATH }}"
             if [ ! -f ".env" ]; then
               printf 'ALLOWED_ORIGINS=\nHOST=0.0.0.0\nPORT=8000\n' > .env
+            fi
+            # 与 CI 同源：远端 pull Docker Hub 需已登录（私有镜像 / 匿名限速会 UNAUTHORIZED）；关闭 xtrace 避免凭据泄漏
+            if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+              set +x
+              echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin docker.io || { set -x; echo "ERROR: docker.io 登录失败" >&2; exit 1; }
+              set -x
+            else
+              echo "WARN: 未配置 DOCKERHUB_USERNAME/DOCKERHUB_TOKEN，Hub 匿名拉取可能失败或限速" >&2
             fi
             # 确保 PostgreSQL 运行并执行数据库迁移
             docker compose up -d postgres
