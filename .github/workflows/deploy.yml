@@ -17,8 +17,10 @@ jobs:
     outputs:
       image_sha: ${{ steps.meta.outputs.sha }}
       use_subdir: ${{ steps.df.outputs.use_subdir }}
+      ghcr_image: ${{ steps.meta.outputs.ghcr }}
     permissions:
       contents: read
+      packages: write
     steps:
       # Pin to specific commit to avoid tag resolution issues
       # v4.1.1
@@ -53,10 +55,20 @@ jobs:
         run: |
           SHA_TAG=${GITHUB_SHA::7}
           echo "sha=${SHA_TAG}" >> $GITHUB_OUTPUT
+          GHCR_LOWER=$(echo "ghcr.io/${GITHUB_REPOSITORY_OWNER}/rust-backend" | tr '[:upper:]' '[:lower:]')
+          echo "ghcr=${GHCR_LOWER}" >> $GITHUB_OUTPUT
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             REF_TAG=${GITHUB_REF#refs/tags/}
             echo "ref_tag=${REF_TAG}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Log in to GHCR
+        if: ${{ steps.cred.outputs.has == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Detect Dockerfile location
         id: df
@@ -84,6 +96,9 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:latest
             ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.sha }}
             ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', env.BACKEND_IMAGE, steps.meta.outputs.ref_tag) || '' }}
+            ${{ steps.meta.outputs.ghcr }}:latest
+            ${{ steps.meta.outputs.ghcr }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', steps.meta.outputs.ghcr, steps.meta.outputs.ref_tag) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -100,6 +115,9 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:latest
             ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.sha }}
             ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', env.BACKEND_IMAGE, steps.meta.outputs.ref_tag) || '' }}
+            ${{ steps.meta.outputs.ghcr }}:latest
+            ${{ steps.meta.outputs.ghcr }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.ref_tag && format('{0}:{1}', steps.meta.outputs.ghcr, steps.meta.outputs.ref_tag) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -122,13 +140,14 @@ jobs:
         env:
           IMAGE_SHA: ${{ needs.build-and-push.outputs.image_sha }}
           DEPLOY_USE_SUBDIR: ${{ needs.build-and-push.outputs.use_subdir }}
+          GHCR_IMAGE: ${{ needs.build-and-push.outputs.ghcr_image }}
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SERVER_SSH_PORT }}
-          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA,IMAGE_SHA,DEPLOY_USE_SUBDIR
+          envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA,IMAGE_SHA,DEPLOY_USE_SUBDIR,GHCR_IMAGE
           script: |
             set -euxo pipefail
             HUB_REF="${BACKEND_IMAGE}:latest"
@@ -152,7 +171,7 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
-            # 优先拉 CI 推送的短 SHA 标签，再 tag 成 latest（与 Docker Hub digest 对齐）；失败再拉 latest
+            # 优先 Docker Hub SHA；腾讯云访问 Hub 易超时则改试 GHCR 同 SHA
             pulled=0
             for attempt in 1 2 3 4 5; do
               if docker pull "${TAG_REF}"; then
@@ -163,8 +182,21 @@ jobs:
               sleep $((attempt * 8))
             done
 
+            if [ "${pulled}" -ne 1 ] && [ -n "${GHCR_IMAGE:-}" ]; then
+              GHCR_TAG="${GHCR_IMAGE}:${SHA_TAG}"
+              echo "WARN: Docker Hub 拉取 ${TAG_REF} 失败，尝试 GHCR ${GHCR_TAG}" >&2
+              for attempt in 1 2 3 4 5; do
+                if docker pull "${GHCR_TAG}"; then
+                  docker tag "${GHCR_TAG}" "${HUB_REF}"
+                  pulled=1
+                  break
+                fi
+                sleep $((attempt * 8))
+              done
+            fi
+
             if [ "${pulled}" -ne 1 ]; then
-              echo "WARN: 拉取 ${TAG_REF} 失败，回退 docker pull latest" >&2
+              echo "WARN: 拉取 ${TAG_REF} 失败，回退 docker pull ${HUB_REF}" >&2
               pulled=0
               for attempt in 1 2 3 4 5; do
                 if docker pull "${HUB_REF}"; then
@@ -172,7 +204,20 @@ jobs:
                   break
                 fi
                 sleep $((attempt * 8))
-              fi
+              done
+            fi
+
+            if [ "${pulled}" -ne 1 ] && [ -n "${GHCR_IMAGE:-}" ]; then
+              GHCR_LATEST="${GHCR_IMAGE}:latest"
+              echo "WARN: Docker Hub latest 失败，尝试 ${GHCR_LATEST}" >&2
+              for attempt in 1 2 3 4 5; do
+                if docker pull "${GHCR_LATEST}"; then
+                  docker tag "${GHCR_LATEST}" "${HUB_REF}"
+                  pulled=1
+                  break
+                fi
+                sleep $((attempt * 8))
+              done
             fi
 
             docker image inspect "${HUB_REF}" --format 'deployed RepoDigests={{json .RepoDigests}} ImageID={{.Id}}' || true
