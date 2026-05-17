@@ -14,8 +14,6 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    outputs:
-      deploy_digest: ${{ steps.deploy_digest.outputs.value }}
     permissions:
       contents: read
     steps:
@@ -102,20 +100,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Resolve deploy digest
-        if: ${{ steps.cred.outputs.has == 'true' }}
-        id: deploy_digest
-        run: |
-          DIGEST="${{ steps.build_subdir.outputs.digest }}"
-          if [ -z "$DIGEST" ]; then
-            DIGEST="${{ steps.build_root.outputs.digest }}"
-          fi
-          if [ -z "$DIGEST" ]; then
-            echo "Cannot resolve backend image digest" >&2
-            exit 1
-          fi
-          echo "value=$DIGEST" >> "$GITHUB_OUTPUT"
-
   deploy:
     name: Deploy to Tencent Cloud
     runs-on: ubuntu-latest
@@ -141,12 +125,7 @@ jobs:
           envs: BACKEND_IMAGE,REPO_URL,GITHUB_SHA
           script: |
             set -euxo pipefail
-            TARGET_DIGEST="${{ needs.build-and-push.outputs.deploy_digest }}"
-            if [ -z "${TARGET_DIGEST}" ]; then
-              echo "ERROR: deploy digest is empty, cannot deploy backend image safely" >&2
-              exit 1
-            fi
-            TARGET_REF="${BACKEND_IMAGE}@${TARGET_DIGEST}"
+            HUB_REF="${BACKEND_IMAGE}:latest"
             if [ ! -d "${{ secrets.DEPLOY_PATH }}" ]; then
               mkdir -p "${{ secrets.DEPLOY_PATH }}"
             fi
@@ -164,25 +143,36 @@ jobs:
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
 
-            # 拉取并固定到本次构建 digest，避免 latest 标签漂移或缓存不一致
+            # 使用 registry 上的 latest 标签（与 CI push 一致）；出站不稳时退避重试
             pulled=0
             for attempt in 1 2 3 4 5; do
-              if docker pull "${TARGET_REF}"; then
+              if docker pull "${HUB_REF}"; then
                 pulled=1
                 break
               fi
+              sleep $((attempt * 8))
             done
 
             if [ "${pulled}" -ne 1 ]; then
               BUILD_DIR="/tmp/rust-backend-${GITHUB_SHA}"
               rm -rf "${BUILD_DIR}"
-              git clone "${REPO_URL}" "${BUILD_DIR}"
+              cloned=0
+              for attempt in 1 2 3 4 5; do
+                if git clone "${REPO_URL}" "${BUILD_DIR}"; then
+                  cloned=1
+                  break
+                fi
+                rm -rf "${BUILD_DIR}"
+                sleep $((attempt * 15))
+              done
+              if [ "${cloned}" -ne 1 ]; then
+                echo "ERROR: docker pull latest 与 git clone 重试均失败" >&2
+                exit 1
+              fi
               cd "${BUILD_DIR}"
               git checkout "${GITHUB_SHA}"
               docker build --platform linux/amd64 -t "${BACKEND_IMAGE}:latest" .
               cd "${{ secrets.DEPLOY_PATH }}"
-            else
-              docker tag "${TARGET_REF}" "${BACKEND_IMAGE}:latest"
             fi
             # 强制移除旧容器，确保新镜像生效
             docker compose rm -sf backend || true
