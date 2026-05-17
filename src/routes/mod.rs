@@ -41,7 +41,7 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/stock-watchlist", stock_watchlist::router())
         .nest("/stock-watchlist-query", stock_watchlist_query::router())
         .nest("/ai-analysis", ai_analysis::router())
-        .nest("/convertible-bond-query", convertible_bond_query::router())
+        .merge(convertible_bond_query::router())
         .nest("/basic-data-analysis", basic_data_analysis::router());
 
     Router::new()
