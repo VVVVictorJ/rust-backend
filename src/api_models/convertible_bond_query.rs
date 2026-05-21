@@ -10,6 +10,9 @@ pub struct ConvertibleBondItem {
     pub transfer_premium_ratio: f64,
     pub stock_price: Option<f64>,
     pub bond_price: Option<f64>,
+    /// DELIST_DATE 非空且「最后交易日」距今天在 [0,3] 个日历日内时为 true（前端标红）
+    #[serde(default)]
+    pub near_last_trading_day: bool,
 }
 
 #[derive(Debug, Serialize)]
