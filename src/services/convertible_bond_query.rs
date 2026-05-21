@@ -177,9 +177,7 @@ struct NumericCbFields {
 }
 
 fn parse_numeric_cb_fields(row: &Value) -> Option<NumericCbFields> {
-    if parse_number(row.get("TRANSFER_PRICE")).is_none() {
-        return None;
-    }
+    parse_number(row.get("TRANSFER_PRICE"))?;
 
     let issue_scale = parse_number(row.get("ACTUAL_ISSUE_SCALE"))?;
     if !(3.0..=5.0).contains(&issue_scale) {
