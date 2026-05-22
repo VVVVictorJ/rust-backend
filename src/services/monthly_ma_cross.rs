@@ -42,7 +42,7 @@ pub fn eval_monthly_ma5_cross_ma20(
         }
     }
 
-    klines.sort_by(|a, b| a.trade_date.cmp(&b.trade_date));
+    klines.sort_by_key(|a| a.trade_date);
     let n = klines.len();
     if n < 21 {
         return Ok(EvalOutcome::Miss {
