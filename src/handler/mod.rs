@@ -4,6 +4,8 @@ pub mod convertible_bond_query;
 pub mod daily_kline;
 pub mod dynamic_backtrack;
 pub mod error;
+pub mod monthly_kline;
+pub mod multi_level_filter;
 pub mod profit_analysis;
 pub mod scheduler;
 pub mod stock;

@@ -58,7 +58,7 @@ pub async fn create_watchlist_kline_job(
                     "watchlist_kline_import".to_string(),
                     "running".to_string(),
                 );
-                
+
                 match run_watchlist_kline_task(pool).await {
                     Ok(result) => {
                         // 广播任务完成

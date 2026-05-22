@@ -30,7 +30,10 @@ pub enum ConvertibleBondError {
     Url(String),
 }
 
-fn build_convertible_list_url(page_number: &str, page_size: &str) -> Result<Url, ConvertibleBondError> {
+fn build_convertible_list_url(
+    page_number: &str,
+    page_size: &str,
+) -> Result<Url, ConvertibleBondError> {
     let sort_columns = "PUBLIC_START_DATE,SECURITY_CODE";
     let sort_types = "-1,-1";
     let report_name = "RPT_BOND_CB_LIST";
@@ -198,7 +201,11 @@ fn parse_numeric_cb_fields(row: &Value) -> Option<NumericCbFields> {
     })
 }
 
-fn build_convertible_item(row: &Value, fields: &NumericCbFields, near_last_trading_day: bool) -> ConvertibleBondItem {
+fn build_convertible_item(
+    row: &Value,
+    fields: &NumericCbFields,
+    near_last_trading_day: bool,
+) -> ConvertibleBondItem {
     ConvertibleBondItem {
         bond_code: parse_string(row.get("SECURITY_CODE")),
         bond_short_name: parse_string(row.get("SECURITY_NAME_ABBR")),
@@ -313,8 +320,7 @@ pub async fn fetch_filtered_convertible_bonds_with_proxy_client(
     let page_size = "500";
 
     let url_first = build_convertible_list_url("1", page_size)?;
-    let root_first =
-        fetch_convertible_page_json(&proxy_client, &headers, url_first, 1).await?;
+    let root_first = fetch_convertible_page_json(&proxy_client, &headers, url_first, 1).await?;
 
     root_first
         .pointer("/result/data")
@@ -327,8 +333,7 @@ pub async fn fetch_filtered_convertible_bonds_with_proxy_client(
 
     for pn in 2..=total_pages {
         let url = build_convertible_list_url(&pn.to_string(), page_size)?;
-        let root =
-            fetch_convertible_page_json(&proxy_client, &headers, url, pn).await?;
+        let root = fetch_convertible_page_json(&proxy_client, &headers, url, pn).await?;
         append_rows_from_result(&mut all_rows, &root);
     }
 

@@ -6,4 +6,5 @@ pub mod middleware;
 pub mod percent;
 pub mod proxy;
 pub mod secid;
+pub mod stock_name_filter;
 pub mod ws_broadcast;

@@ -7,6 +7,8 @@ mod basic_data_analysis;
 mod convertible_bond_query;
 mod daily_kline;
 mod dynamic_backtrack;
+mod monthly_kline;
+mod multi_level_filter;
 mod profit_analysis;
 mod root;
 mod scheduler;
@@ -30,6 +32,8 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/stock-snapshots", stock_snapshot::router())
         .nest("/profit-analyses", profit_analysis::router())
         .nest("/daily-klines", daily_kline::router())
+        .nest("/monthly-klines", monthly_kline::router())
+        .nest("/multi-level-filter", multi_level_filter::router())
         .nest("/scheduler", scheduler::router())
         .nest("/stock-trade-date-query", stock_trade_date_query::router())
         .nest("/stock-track-query", stock_track_query::router())

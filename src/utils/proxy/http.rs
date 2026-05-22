@@ -7,12 +7,26 @@ use tokio::sync::Mutex;
 
 use super::{ProxyClient, ProxyError};
 
+/// 截取 UTF-8 预览（有损），便于日志排障且不刷爆控制台。
+fn body_preview_utf8(bytes: &[u8], max_chars: usize) -> String {
+    let s = String::from_utf8_lossy(bytes);
+    s.chars().take(max_chars).collect()
+}
+
+async fn invalidate_shared_proxy(proxy_client: &Arc<Mutex<ProxyClient>>) {
+    let mut guard = proxy_client.lock().await;
+    guard.invalidate_proxy();
+}
+
+/// GET 并经代理出站，期望 JSON。**先读完整字节再解码**，区别于 `resp.json()`，以便：
+/// - HTTP 502/网关页等非 JSON：记录状态码与正文前缀并重试/换代理；
+/// - 偶发截断、压缩流异常：换代理后重试。
 pub async fn proxy_get_json(
     proxy_client: &Arc<Mutex<ProxyClient>>,
     url: Url,
     headers: &HeaderMap,
 ) -> Result<Value, ProxyError> {
-    let max_attempts = 2;
+    let max_attempts = 6;
     let mut current_url = url;
     let mut attempted_http_fallback = false;
     for attempt in 1..=max_attempts {
@@ -39,26 +53,71 @@ pub async fn proxy_get_json(
                     }
                 }
 
-                {
-                    let mut guard = proxy_client.lock().await;
-                    guard.invalidate_proxy();
-                }
+                invalidate_shared_proxy(proxy_client).await;
                 if attempt < max_attempts {
                     continue;
                 }
                 return Err(err.into());
             }
         };
-        let json = match resp.json::<Value>().await {
-            Ok(json) => json,
+
+        let status = resp.status();
+        let bytes = match resp.bytes().await {
+            Ok(b) => b,
             Err(err) => {
+                invalidate_shared_proxy(proxy_client).await;
                 if attempt < max_attempts {
                     continue;
                 }
                 return Err(err.into());
             }
         };
-        return Ok(json);
+
+        if !status.is_success() {
+            let preview = body_preview_utf8(&bytes, 400);
+            tracing::warn!(
+                target: "proxy",
+                %status,
+                len = bytes.len(),
+                preview,
+                url = %current_url,
+                attempt,
+                "proxy_get_json upstream HTTP non-success"
+            );
+            invalidate_shared_proxy(proxy_client).await;
+            if attempt < max_attempts {
+                continue;
+            }
+            return Err(ProxyError::Status {
+                status,
+                body: preview,
+            });
+        }
+
+        match serde_json::from_slice::<Value>(&bytes) {
+            Ok(json) => return Ok(json),
+            Err(err) => {
+                let preview = body_preview_utf8(&bytes, 800);
+                tracing::warn!(
+                    target: "proxy",
+                    attempt,
+                    len = bytes.len(),
+                    preview,
+                    url = %current_url,
+                    parse_err = %err,
+                    "proxy_get_json JSON decode failed, will retry with fresh proxy if possible"
+                );
+                invalidate_shared_proxy(proxy_client).await;
+                if attempt < max_attempts {
+                    continue;
+                }
+                return Err(ProxyError::Parse(format!(
+                    "JSON 解码失败: {err}；响应长度 {} 字节，前缀: {}",
+                    bytes.len(),
+                    preview
+                )));
+            }
+        }
     }
     Err(ProxyError::NoProxyData)
 }

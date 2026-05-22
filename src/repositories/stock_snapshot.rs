@@ -1,13 +1,16 @@
+use bigdecimal::BigDecimal;
 use chrono::{DateTime, FixedOffset, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::Text;
+use diesel::sql_types::{Jsonb, Numeric, Text};
+use serde_json::Value;
 
 use crate::models::{NewStockSnapshot, StockSnapshot};
 use crate::schema::stock_snapshots::dsl::{
     created_at, id, request_id, stock_code as stock_code_col, stock_snapshots,
 };
+use crate::utils::stock_name_filter;
 
 pub type PgPoolConn = PooledConnection<ConnectionManager<PgConnection>>;
 
@@ -133,4 +136,52 @@ pub fn list_distinct_codes_with_name(
     "#;
 
     diesel::sql_query(query).load::<StockCodeName>(conn)
+}
+
+/// 每股取 `created_at` 最新的一条快照（代码 / 名称 / 最新价 / 板块 JSON，与交易日查询聚合方式一致）
+#[derive(Debug, QueryableByName)]
+pub struct LatestSnapshotFields {
+    #[diesel(sql_type = Text)]
+    pub stock_code: String,
+    #[diesel(sql_type = Text)]
+    pub stock_name: String,
+    #[diesel(sql_type = Numeric)]
+    pub latest_price: BigDecimal,
+    #[diesel(sql_type = Jsonb)]
+    pub plates: Value,
+}
+
+/// 每只股取最新一条快照（代码 / 名称 / 价 / 板块），**不包含** ST、*ST、S*ST、SST 等特殊处理简称。
+pub fn list_latest_snapshot_fields_per_stock(
+    conn: &mut PgPoolConn,
+) -> Result<Vec<LatestSnapshotFields>, diesel::result::Error> {
+    let query = r#"
+        WITH latest_snap AS (
+            SELECT DISTINCT ON (stock_code)
+                stock_code,
+                stock_name,
+                latest_price
+            FROM stock_snapshots
+            ORDER BY stock_code, created_at DESC
+        )
+        SELECT
+            ls.stock_code,
+            ls.stock_name,
+            ls.latest_price,
+            COALESCE(
+                jsonb_agg(DISTINCT jsonb_build_object('plate_code', sp.plate_code, 'name', sp.name))
+                    FILTER (WHERE sp.id IS NOT NULL),
+                '[]'::jsonb
+            ) AS plates
+        FROM latest_snap ls
+        LEFT JOIN stock_table st ON ls.stock_code = st.stock_code
+        LEFT JOIN stock_plate_stock_table sps ON st.id = sps.stock_table_id
+        LEFT JOIN stock_plate sp ON sps.plate_id = sp.id
+        GROUP BY ls.stock_code, ls.stock_name, ls.latest_price
+        ORDER BY ls.stock_code
+    "#;
+
+    let mut rows = diesel::sql_query(query).load::<LatestSnapshotFields>(conn)?;
+    rows.retain(|r| !stock_name_filter::is_st_special_stock_name(&r.stock_name));
+    Ok(rows)
 }
