@@ -118,6 +118,38 @@ pub async fn fetch_and_parse_monthly_kline_via_proxy_only(
         .await
 }
 
+/// 多级筛选日线二次校验：拉回约 **`lookback_calendar_days`** 个自然日内日 K（`klt=101`），避免全历史日线体量过大。
+pub async fn fetch_and_parse_daily_kline_via_proxy_only(
+    stock_code: &str,
+) -> Result<KlineParseResult, KlineServiceError> {
+    const LOOKBACK_CAL_DAYS: i64 = 150;
+    fetch_and_parse_daily_kline_via_proxy_only_with_days(stock_code, LOOKBACK_CAL_DAYS).await
+}
+
+pub async fn fetch_and_parse_daily_kline_via_proxy_only_with_days(
+    stock_code: &str,
+    lookback_calendar_days: i64,
+) -> Result<KlineParseResult, KlineServiceError> {
+    use chrono::Utc;
+    use chrono_tz::Asia::Shanghai;
+
+    let today = Utc::now().with_timezone(&Shanghai).date_naive();
+    let beg_naive = today
+        .checked_sub_signed(chrono::Duration::days(lookback_calendar_days))
+        .unwrap_or(today);
+    let beg = beg_naive.format("%Y%m%d").to_string();
+    const END: &str = "20500101";
+    let json_data = fetch_eastmoney_kline_params(
+        monthly_placeholder_client_for_monthly_api(),
+        stock_code,
+        "101",
+        &beg,
+        END,
+    )
+    .await?;
+    parse_kline_json(&json_data)
+}
+
 static MONTHLY_KLINE_DUMMY_HTTP: OnceLock<Client> = OnceLock::new();
 
 fn monthly_placeholder_client_for_monthly_api() -> &'static Client {

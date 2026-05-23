@@ -48,3 +48,10 @@ pub struct MonthlyMaCrossResponse {
     pub items: Vec<MonthlyMaCrossItem>,
     pub skipped: Vec<SkippedStock>,
 }
+
+/// 日线在刚上穿：一次返回月线全量扫描结果 + 月线命中基础上的日线判别，前端两 Tab 同步更新。
+#[derive(Debug, Clone, Serialize)]
+pub struct DailyAfterMonthlyMaCrossResponse {
+    pub monthly: MonthlyMaCrossResponse,
+    pub daily_refinement: MonthlyMaCrossResponse,
+}

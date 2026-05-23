@@ -1,5 +1,6 @@
 pub mod ai_service;
 pub mod convertible_bond_query;
+pub mod daily_ma_cross;
 pub mod kline_service;
 pub mod monthly_ma_cross;
 pub mod monthly_ma_cross_screen_cache;
