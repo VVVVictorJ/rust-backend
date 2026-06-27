@@ -1,4 +1,5 @@
 pub mod ai_service;
+pub mod almanac;
 pub mod convertible_bond_query;
 pub mod daily_ma_cross;
 pub mod kline_service;

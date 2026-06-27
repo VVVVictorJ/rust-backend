@@ -1,0 +1,11 @@
+use diesel::prelude::*;
+
+#[derive(Queryable, Selectable, Debug, Clone)]
+#[diesel(table_name = crate::schema::he_luo_lookup)]
+pub struct HeLuoLookup {
+    pub id: i32,
+    pub matrix_code: String,
+    pub row_key: String,
+    pub col_key: String,
+    pub value: i16,
+}

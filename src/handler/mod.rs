@@ -1,4 +1,5 @@
 pub mod ai_analysis;
+pub mod bagua;
 pub mod basic_data_analysis;
 pub mod convertible_bond_query;
 pub mod daily_kline;

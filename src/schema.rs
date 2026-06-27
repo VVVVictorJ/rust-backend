@@ -144,6 +144,16 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    he_luo_lookup (id) {
+        id -> Int4,
+        matrix_code -> Varchar,
+        row_key -> Varchar,
+        col_key -> Varchar,
+        value -> Int2,
+    }
+}
+
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
@@ -151,6 +161,7 @@ diesel::joinable!(stock_plate_stock_table -> stock_plate (plate_id));
 diesel::joinable!(stock_plate_stock_table -> stock_table (stock_table_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
+    he_luo_lookup,
     stock_requests,
     stock_request_stocks,
     stock_plate,

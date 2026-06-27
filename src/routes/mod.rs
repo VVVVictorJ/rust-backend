@@ -3,6 +3,7 @@ use axum::Router;
 use crate::app::AppState;
 
 mod ai_analysis;
+mod bagua;
 mod basic_data_analysis;
 mod convertible_bond_query;
 mod daily_kline;
@@ -46,7 +47,8 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/stock-watchlist-query", stock_watchlist_query::router())
         .nest("/ai-analysis", ai_analysis::router())
         .merge(convertible_bond_query::router())
-        .nest("/basic-data-analysis", basic_data_analysis::router());
+        .nest("/basic-data-analysis", basic_data_analysis::router())
+        .nest("/bagua", bagua::router());
 
     Router::new()
         // 根路径与健康检查

@@ -182,11 +182,14 @@ jobs:
             docker compose up -d postgres
             sleep 5
             docker exec stock-postgres psql -U stock_user -d stock_analysis -f /docker-entrypoint-initdb.d/01-init.sql || true
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -f /docker-entrypoint-initdb.d/03-he-luo-lookup.sql || true
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -f /docker-entrypoint-initdb.d/04-luoshu-lookup.sql || true
             # 输出表/索引检查结果
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\dt"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_table"
             docker exec stock-postgres psql -U stock_user -d stock_analysis -c "\d stock_plate_stock_table"
+            docker exec stock-postgres psql -U stock_user -d stock_analysis -c "SELECT matrix_code, count(*) FROM he_luo_lookup GROUP BY matrix_code ORDER BY matrix_code;"
 
             # 默认先试 Docker Hub（与 BACKEND_IMAGE 同源）；GHCR 仅作备选。可用 DEPLOY_PULL_ORDER=ghcr-first 恢复原顺序。
             ORDER="${DEPLOY_PULL_ORDER:-dockerhub-first}"

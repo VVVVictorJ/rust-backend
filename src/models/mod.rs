@@ -1,4 +1,5 @@
 pub mod ai_trend_analysis;
+pub mod he_luo_lookup;
 pub mod daily_klines;
 pub mod job_execution_history;
 pub mod profit_analysis;
@@ -10,6 +11,7 @@ pub mod stock_snapshots;
 pub mod stock_tables;
 pub mod stock_watchlist;
 
+pub use he_luo_lookup::HeLuoLookup;
 pub use ai_trend_analysis::{AiTrendAnalysis, NewAiTrendAnalysis, UpdateAiTrendAnalysis};
 pub use daily_klines::{DailyKline, NewDailyKline};
 pub use job_execution_history::{NewJobExecutionHistory, UpdateJobExecutionHistory};

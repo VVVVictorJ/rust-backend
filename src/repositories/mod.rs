@@ -1,4 +1,5 @@
 pub mod ai_trend_analysis;
+pub mod he_luo_lookup;
 pub mod basic_data_analysis;
 pub mod daily_kline;
 pub mod dynamic_backtrack;
