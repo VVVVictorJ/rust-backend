@@ -1,7 +1,8 @@
 use diesel::prelude::*;
 
-#[derive(Queryable, Selectable, Debug, Clone)]
+#[derive(Queryable, Debug, Clone)]
 #[diesel(table_name = crate::schema::he_luo_lookup)]
+#[allow(dead_code)]
 pub struct HeLuoLookup {
     pub id: i32,
     pub matrix_code: String,
