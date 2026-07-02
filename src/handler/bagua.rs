@@ -13,6 +13,7 @@ use crate::repositories::he_luo_lookup;
 use crate::services::almanac;
 
 const HETU_MATRIX: &str = "hetu";
+const HETU_CROSS_MATRIX: &str = "hetu_cross";
 const LUOSHU_STEM_MATRIX: &str = "luoshu_stem";
 const LUOSHU_BRANCH_MATRIX: &str = "luoshu_branch";
 
@@ -71,6 +72,13 @@ pub async fn get_hetu_lookup(
     Query(params): Query<HetuLookupQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     get_matrix_lookup(state, HETU_MATRIX, params).await
+}
+
+pub async fn get_hetu_cross_lookup(
+    State(state): State<AppState>,
+    Query(params): Query<HetuLookupQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    get_matrix_lookup(state, HETU_CROSS_MATRIX, params).await
 }
 
 pub async fn get_luoshu_stem_lookup(
