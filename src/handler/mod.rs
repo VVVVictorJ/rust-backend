@@ -10,6 +10,7 @@ pub mod multi_level_filter;
 pub mod profit_analysis;
 pub mod scheduler;
 pub mod stock;
+pub mod stock_appearance_query;
 pub mod stock_persist;
 pub mod stock_plate;
 pub mod stock_plate_em;

@@ -5,6 +5,7 @@ pub mod daily_kline;
 pub mod dynamic_backtrack;
 pub mod job_execution_history;
 pub mod profit_analysis;
+pub mod stock_appearance_query;
 pub mod stock_plate;
 pub mod stock_plate_stock_table;
 pub mod stock_price_compare;

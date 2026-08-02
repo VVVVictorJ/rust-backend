@@ -10,6 +10,7 @@ pub mod multi_level_filter;
 pub mod profit_analysis;
 pub mod scheduler;
 pub mod stock;
+pub mod stock_appearance_query;
 pub mod stock_plate;
 pub mod stock_plate_em;
 pub mod stock_plate_stock_table;
@@ -48,6 +49,10 @@ pub use profit_analysis::{CreateProfitAnalysis, ProfitAnalysisResponse};
 #[allow(unused_imports)]
 pub use scheduler::{
     HistoryQueryParams, JobExecutionHistoryItem, JobExecutionHistoryResponse, JobInfo,
+};
+#[allow(unused_imports)]
+pub use stock_appearance_query::{
+    StockAppearanceQueryItem, StockAppearanceQueryRequest, StockAppearanceQueryResponse,
 };
 #[allow(unused_imports)]
 pub use stock_plate::{CreateStockPlate, StockPlateResponse, UpdateStockPlateRequest};

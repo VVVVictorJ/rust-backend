@@ -14,6 +14,7 @@ mod profit_analysis;
 mod root;
 mod scheduler;
 pub mod stock;
+mod stock_appearance_query;
 mod stock_plate;
 mod stock_plate_stock_table;
 mod stock_price_compare;
@@ -37,6 +38,7 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/multi-level-filter", multi_level_filter::router())
         .nest("/scheduler", scheduler::router())
         .nest("/stock-trade-date-query", stock_trade_date_query::router())
+        .nest("/stock-appearance-query", stock_appearance_query::router())
         .nest("/stock-track-query", stock_track_query::router())
         .nest("/stock-price-compare", stock_price_compare::router())
         .nest("/stock-plates", stock_plate::router())
