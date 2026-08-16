@@ -3,6 +3,7 @@ pub mod he_luo_lookup;
 pub mod basic_data_analysis;
 pub mod daily_kline;
 pub mod dynamic_backtrack;
+pub mod export_button_config;
 pub mod job_execution_history;
 pub mod profit_analysis;
 pub mod stock_appearance_query;

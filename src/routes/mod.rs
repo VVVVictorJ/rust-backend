@@ -8,6 +8,7 @@ mod basic_data_analysis;
 mod convertible_bond_query;
 mod daily_kline;
 mod dynamic_backtrack;
+mod export_button_config;
 mod monthly_kline;
 mod multi_level_filter;
 mod profit_analysis;
@@ -50,6 +51,7 @@ pub fn build_routes() -> Router<AppState> {
         .nest("/ai-analysis", ai_analysis::router())
         .merge(convertible_bond_query::router())
         .nest("/basic-data-analysis", basic_data_analysis::router())
+        .nest("/export-button-config", export_button_config::router())
         .nest("/bagua", bagua::router());
 
     Router::new()

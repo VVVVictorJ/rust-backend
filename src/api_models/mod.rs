@@ -4,6 +4,7 @@ pub mod basic_data_analysis;
 pub mod convertible_bond_query;
 pub mod daily_kline;
 pub mod dynamic_backtrack;
+pub mod export_button_config;
 pub mod kline_import;
 pub mod monthly_kline;
 pub mod multi_level_filter;
@@ -94,4 +95,8 @@ pub use stock_watchlist_query::{
     WatchlistDetailItem, WatchlistDetailRequest, WatchlistDetailResponse, WatchlistKlineItem,
     WatchlistKlineRequest, WatchlistKlineResponse, WatchlistQueryItem, WatchlistQueryRequest,
     WatchlistQueryResponse,
+};
+#[allow(unused_imports)]
+pub use export_button_config::{
+    CreateExportButtonConfigRequest, ExportButtonConfigResponse, UpdateExportButtonConfigRequest,
 };

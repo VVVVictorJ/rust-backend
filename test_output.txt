@@ -1,0 +1,1 @@
+psql: 错误: 致命错误:  用户 "stock_user" Password 认证失败

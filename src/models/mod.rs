@@ -1,6 +1,7 @@
 pub mod ai_trend_analysis;
 pub mod he_luo_lookup;
 pub mod daily_klines;
+pub mod export_button_configs;
 pub mod job_execution_history;
 pub mod profit_analysis;
 pub mod stock_plate_stock_tables;
@@ -14,6 +15,7 @@ pub mod stock_watchlist;
 pub use he_luo_lookup::HeLuoLookup;
 pub use ai_trend_analysis::{AiTrendAnalysis, NewAiTrendAnalysis, UpdateAiTrendAnalysis};
 pub use daily_klines::{DailyKline, NewDailyKline};
+pub use export_button_configs::{ExportButtonConfig, NewExportButtonConfig, UpdateExportButtonConfig};
 pub use job_execution_history::{NewJobExecutionHistory, UpdateJobExecutionHistory};
 pub use profit_analysis::{NewProfitAnalysis, ProfitAnalysis};
 #[allow(unused_imports)]

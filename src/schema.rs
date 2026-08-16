@@ -154,6 +154,18 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    export_button_config (id) {
+        id -> Int4,
+        page_key -> Varchar,
+        name -> Varchar,
+        plate_codes -> Jsonb,
+        sort_order -> Int4,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(stock_request_stocks -> stock_requests (request_id));
 diesel::joinable!(stock_snapshots -> stock_requests (request_id));
 diesel::joinable!(profit_analysis -> stock_snapshots (snapshot_id));
@@ -174,4 +186,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     stock_watchlist,
     ai_trend_analysis,
     stock_trading_calendar,
+    export_button_config,
 );
