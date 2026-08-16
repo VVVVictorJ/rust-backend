@@ -1,9 +1,9 @@
 use bigdecimal::BigDecimal;
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use diesel::sql_types::{Jsonb, Numeric, Text};
+use diesel::sql_types::{BigInt, Date as SqlDate, Jsonb, Numeric, Text};
 use serde_json::Value;
 
 use crate::models::{NewStockSnapshot, StockSnapshot};
@@ -121,6 +121,36 @@ pub struct StockCodeName {
     pub code: String,
     #[diesel(sql_type = Text, column_name = "stock_name")]
     pub name: String,
+}
+
+/// 某天的去重股票支数（日期按 Asia/Shanghai 时区归属）
+#[derive(Debug, QueryableByName)]
+pub struct DailyStockCount {
+    #[diesel(sql_type = SqlDate)]
+    pub stat_date: NaiveDate,
+    #[diesel(sql_type = BigInt)]
+    pub stock_count: i64,
+}
+
+/// 统计日期范围内每天抓取到的去重股票支数
+pub fn count_distinct_codes_by_date_range(
+    conn: &mut PgPoolConn,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<Vec<DailyStockCount>, diesel::result::Error> {
+    let query = r#"
+        SELECT (created_at AT TIME ZONE 'Asia/Shanghai')::date AS stat_date,
+               COUNT(DISTINCT stock_code) AS stock_count
+        FROM stock_snapshots
+        WHERE (created_at AT TIME ZONE 'Asia/Shanghai')::date BETWEEN $1::date AND $2::date
+        GROUP BY stat_date
+        ORDER BY stat_date;
+    "#;
+
+    diesel::sql_query(query)
+        .bind::<SqlDate, _>(start)
+        .bind::<SqlDate, _>(end)
+        .load::<DailyStockCount>(conn)
 }
 
 /// 获取去重后的 stock_code + stock_name（按 created_at 倒序取最新）

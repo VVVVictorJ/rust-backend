@@ -5,12 +5,14 @@ use axum::{
 
 use crate::app::AppState;
 use crate::handler::stock_snapshot::{
-    create_stock_snapshot, delete_stock_snapshot, get_stock_snapshot, get_today_stock_codes,
+    create_stock_snapshot, delete_stock_snapshot, get_daily_stock_counts, get_stock_snapshot,
+    get_today_stock_codes,
 };
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_stock_snapshot))
+        .route("/daily-counts", get(get_daily_stock_counts))
         .route(
             "/:id",
             get(get_stock_snapshot).delete(delete_stock_snapshot),

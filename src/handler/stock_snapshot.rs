@@ -1,13 +1,15 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
+use chrono::NaiveDate;
 use diesel::result::Error as DieselError;
 use serde::Serialize;
 
 use crate::api_models::stock_snapshot::{
-    CreateStockSnapshot, StockSnapshotResponse, TodayStockCodesResponse,
+    CreateStockSnapshot, DailyCountQuery, DailyStockCountItem, StockSnapshotResponse,
+    TodayStockCodesResponse,
 };
 use crate::app::AppState;
 use crate::handler::error::AppError;
@@ -100,6 +102,35 @@ pub async fn get_today_stock_codes(
         count,
         stock_codes: codes,
     }))
+}
+
+pub async fn get_daily_stock_counts(
+    State(state): State<AppState>,
+    Query(params): Query<DailyCountQuery>,
+) -> Result<Json<Vec<DailyStockCountItem>>, AppError> {
+    let start = NaiveDate::parse_from_str(&params.start, "%Y-%m-%d")
+        .map_err(|_| AppError::BadRequest("invalid start, expect YYYY-MM-DD".to_string()))?;
+    let end = NaiveDate::parse_from_str(&params.end, "%Y-%m-%d")
+        .map_err(|_| AppError::BadRequest("invalid end, expect YYYY-MM-DD".to_string()))?;
+    if start > end {
+        return Err(AppError::BadRequest(
+            "start must not be after end".to_string(),
+        ));
+    }
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| AppError::InternalServerError)?;
+    let rows = stock_snapshot::count_distinct_codes_by_date_range(&mut conn, start, end)
+        .map_err(map_err)?;
+    let data = rows
+        .into_iter()
+        .map(|r| DailyStockCountItem {
+            date: r.stat_date.format("%Y-%m-%d").to_string(),
+            count: r.stock_count,
+        })
+        .collect();
+    Ok(Json(data))
 }
 
 fn map_err(err: DieselError) -> AppError {

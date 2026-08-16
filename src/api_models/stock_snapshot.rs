@@ -35,3 +35,15 @@ pub struct TodayStockCodesResponse {
     pub count: usize,
     pub stock_codes: Vec<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct DailyCountQuery {
+    pub start: String,
+    pub end: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DailyStockCountItem {
+    pub date: String,
+    pub count: i64,
+}
